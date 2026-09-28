@@ -1,0 +1,10 @@
+# CPU-only PyTorch wheels keep the install small (and are what the free HF Space runs on).
+# For a local NVIDIA GPU, install torch from https://pytorch.org first and drop this line.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+torchvision
+ultralytics>=8.3.246
+gradio>=5.0
+requests
+python-dotenv
+imageio-ffmpeg  # bundled ffmpeg for browser-playable (H.264) annotated videos

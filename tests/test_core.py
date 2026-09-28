@@ -1,0 +1,140 @@
+from datetime import datetime
+from pathlib import Path
+from unittest.mock import MagicMock
+
+import numpy as np
+import pytest
+
+from riverguard import Detection, DetectionResult, TelegramAlerter, annotate, build_caption, is_over_threshold
+from riverguard.alerts import Cooldown
+from riverguard.config import DEFAULT_MODEL_PATH
+
+
+def make_result(labels, threshold=5):
+    dets = [Detection(label=l, confidence=0.9, box=(10, 10, 50, 50)) for l in labels]
+    return DetectionResult(detections=dets, threshold=threshold)
+
+
+def test_threshold_is_strictly_greater():
+    assert not is_over_threshold(5, 5)
+    assert is_over_threshold(6, 5)
+    assert not make_result(["plastic_bottle"] * 5).over_threshold
+    assert make_result(["plastic_bottle"] * 6).over_threshold
+
+
+def test_per_class_counts_sorted_by_frequency():
+    result = make_result(["plastic_bag", "plastic_bottle", "plastic_bottle"])
+    assert result.per_class == {"plastic_bottle": 2, "plastic_bag": 1}
+
+
+def test_caption_contents():
+    result = make_result(["plastic_bottle"] * 7 + ["other_plastic"] * 2)
+    caption = build_caption(result, when=datetime(2026, 1, 3, 21, 38, 16))
+    assert "Detected: 9 items" in caption
+    assert "Safe limit: 5 items" in caption
+    assert "plastic_bottle ×7, other_plastic ×2" in caption
+    assert "2026-01-03 21:38:16" in caption
+
+
+def test_cooldown_blocks_until_elapsed():
+    now = [100.0]
+    cd = Cooldown(20, clock=lambda: now[0])
+    assert cd.try_acquire()
+    now[0] = 119.9
+    assert not cd.try_acquire()
+    now[0] = 120.0
+    assert cd.try_acquire()
+
+
+def test_alerter_without_credentials_never_posts():
+    session = MagicMock()
+    alerter = TelegramAlerter(None, None, session=session)
+    frame = np.zeros((64, 64, 3), np.uint8)
+    assert alerter.maybe_alert(frame, make_result(["x"] * 9), background=False) == "disabled"
+    # "disabled" means "would have sent now", so it is rate-limited like a real alert
+    assert alerter.maybe_alert(frame, make_result(["x"] * 9), background=False) == "cooldown"
+    session.post.assert_not_called()
+
+
+def test_alerter_sends_once_per_cooldown():
+    session = MagicMock()
+    session.post.return_value.json.return_value = {"ok": True}
+    alerter = TelegramAlerter("123:abc", "42", cooldown_s=60, session=session)
+    frame = np.zeros((64, 64, 3), np.uint8)
+    over = make_result(["plastic_bottle"] * 9)
+
+    assert alerter.maybe_alert(frame, make_result(["x"]), background=False) == "not_triggered"
+    assert alerter.maybe_alert(frame, over, background=False) == "sent"
+    assert alerter.maybe_alert(frame, over, background=False) == "cooldown"
+    assert session.post.call_count == 1
+
+    kwargs = session.post.call_args.kwargs
+    assert kwargs["data"]["chat_id"] == "42"
+    assert kwargs["data"]["parse_mode"] == "HTML"
+    assert kwargs["timeout"] == 10
+
+
+def test_alerter_reports_telegram_error():
+    session = MagicMock()
+    session.post.return_value.json.return_value = {"ok": False, "description": "Unauthorized"}
+    alerter = TelegramAlerter("bad", "42", session=session)
+    frame = np.zeros((64, 64, 3), np.uint8)
+    assert alerter.maybe_alert(frame, make_result(["x"] * 9), background=False) == "failed"
+
+
+def test_annotate_keeps_shape_and_draws():
+    frame = np.zeros((480, 640, 3), np.uint8)
+    out = annotate(frame, make_result(["plastic_bag"] * 6))
+    assert out.shape == frame.shape
+    assert out.any() and not frame.any()
+
+
+@pytest.mark.skipif(not Path(DEFAULT_MODEL_PATH).exists(), reason="model weights not present")
+def test_model_loads_with_expected_classes():
+    from riverguard import TrashDetector
+
+    detector = TrashDetector(str(DEFAULT_MODEL_PATH))
+    assert detector.class_names == ["other_plastic", "plastic_bag", "plastic_bottle", "plastic_package"]
+    result = detector.detect(np.zeros((640, 640, 3), np.uint8), threshold=5)
+    assert result.count == 0 and not result.over_threshold
+
+
+def test_tile_origins_cover_image_with_overlap():
+    from riverguard.detector import TILE, tile_origins
+
+    origins = tile_origins(960, 1280)
+    assert (0, 0) in origins and (1280 - TILE, 960 - TILE) in origins  # both corners covered
+    assert tile_origins(500, 600) == [(0, 0)]  # smaller than one tile
+
+
+def test_merge_boxes_drops_partial_duplicates_but_keeps_neighbours():
+    from riverguard.detector import merge_boxes
+
+    boxes = np.array([
+        [100, 100, 200, 300],  # full bottle
+        [100, 100, 200, 180],  # same bottle cut by a tile edge (inside the full box)
+        [210, 100, 300, 300],  # a different bottle right next to it
+    ], dtype=float)
+    scores = np.array([0.9, 0.6, 0.8])
+    assert sorted(merge_boxes(boxes, scores)) == [0, 2]
+
+
+def test_dense_patch_triggers_danger_and_is_not_counted_as_an_item():
+    from riverguard import status_text
+
+    result = make_result(["plastic_bottle", "trash_patch"])
+    assert result.count == 1
+    assert result.per_class == {"plastic_bottle": 1}
+    assert len(result.patches) == 1
+    assert result.over_threshold  # a patch alone means DANGER
+    assert status_text(result) == "DANGER: dense trash + 1 item"
+    assert not make_result(["plastic_bottle"] * 5).over_threshold
+
+
+def test_caption_and_drawing_handle_patches():
+    result = make_result(["trash_patch", "trash_patch"])
+    caption = build_caption(result)
+    assert "Dense trash: 2 areas too packed to count" in caption
+    assert "Detected: 0 items" in caption and "🧴" not in caption  # no empty breakdown line
+    frame = np.zeros((480, 640, 3), np.uint8)
+    assert annotate(frame, result).any()

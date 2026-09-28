@@ -1,0 +1,29 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Original course deliverables: contain personal data, a revoked bot token, and a 500 MB video
+_original/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.venv-*/
+.pytest_cache/
+
+# Runtime output
+runs/
+*.log
+.gradio/
+flagged/
+
+# Training data and outputs
+datasets/
+
+# Model downloads made by Ultralytics during experiments (CLIP, YOLOE, base weights)
+weights/
+*.ts
+/yolo*.pt

@@ -1,0 +1,82 @@
+# Datasets merged by training/build_dataset.py.
+#
+# roboflow: <workspace>/<project>/<version>
+# use:      train (pooled, split into train/val) | test (held-out test split only, never trained on)
+# map:      every class of the source -> one of `classes`, or null to drop its boxes.
+#           The builder refuses to run if a source class is missing here, so nothing is merged by accident.
+#
+# Class decisions follow training/LABELING.md: non-plastic (cans, metal, wood, paper, cartons) is dropped,
+# generic "plastic" goes to other_plastic, and region-sized boxes ("Undefined trash") are dropped.
+
+# trash_patch (last, so the item classes keep v1's indices) marks carpets too dense to count; see LABELING.md.
+classes: [other_plastic, plastic_bag, plastic_bottle, plastic_package, trash_patch]
+
+sources:
+  # v1's training data (the team's fork of floatplasticwasteriver/floating-plastic-waste-river).
+  # Rivers, land litter and product-style shots, already labeled in our four classes.
+  - name: base
+    roboflow: plastic-waste/float-plastic-waste-river-yfg5q/3
+    license: CC BY 4.0
+    use: train
+    hold_out: [test]          # its own test split = the in-domain test set (did v2 stay good at v1's job?)
+    map: {other_plastic: other_plastic, plastic_bag: plastic_bag, plastic_bottle: plastic_bottle,
+          plastic_package: plastic_package}
+
+  # Harbour and sea-surface scenes plus drone shots of floating bottles.
+  - name: waste-in-water
+    roboflow: chinatele/waste-in-water/1
+    license: CC BY 4.0
+    use: train
+    map:
+      bottles: plastic_bottle
+      Plastic bottle: plastic_bottle
+      Plastic Bottle: plastic_bottle
+      Plastic-Bottle: plastic_bottle
+      Plastic bag: plastic_bag
+      Plastic Bag: plastic_bag
+      Plastic packaging: plastic_package
+      Plastic cup: plastic_package
+      Plastic: other_plastic
+      plastic: other_plastic
+      Plastic Waste: other_plastic
+      Bottle cap: null        # too small to count reliably
+      Juice box: null         # carton, not plastic
+      Juice Box: null
+      Can: null
+      Metal: null
+      Metal Waste: null
+      Wood: null
+      Undefined trash: null   # boxes cover whole wave regions
+
+  # Low-angle camera across lakes with small, distant floating items (close to a floodgate camera's view).
+  # This is the older copy the team used in the original notebook.
+  - name: floating-waste
+    roboflow: aol-ai-cer7r/floating-waste-r6ifo-hcjzg/1
+    license: CC BY 4.0
+    use: train
+    max_groups: 1500          # mostly consecutive video frames of a few lakes; don't let it dominate
+    map: {bottle: plastic_bottle, plastic: other_plastic, can: null, carton: null, paper: null}
+
+  # Top-down drone footage of a river with water hyacinth and small scattered plastic.
+  - name: river-waste
+    roboflow: class-czqdb/river-waste/2
+    license: MIT
+    use: train
+    map: {Plastic: other_plastic}
+
+  # Hand-labeled hard examples: 51 Marilao River photos, mostly trash_patch. See training/LABELING.md.
+  - name: riverguard-hard
+    roboflow: plastic-waste/riverguard-hard/1
+    license: CC0 (Wikimedia Commons, see training/ATTRIBUTION.md)
+    use: train
+    repeat: 6                 # 51 photos vs ~10k public ones; each copy gets different random augmentation
+    map: {other_plastic: other_plastic, plastic_bag: plastic_bag, plastic_bottle: plastic_bottle,
+          plastic_package: plastic_package, trash_patch: trash_patch}
+
+  # Hand-labeled held-out test set (tier A): 17 real water scenes. Never trained on.
+  - name: riverguard-test
+    roboflow: plastic-waste/riverguard-test/1
+    license: CC BY / CC BY-SA / CC0 / public domain (Wikimedia Commons, see training/ATTRIBUTION.md)
+    use: test
+    map: {other_plastic: other_plastic, plastic_bag: plastic_bag, plastic_bottle: plastic_bottle,
+          plastic_package: plastic_package, trash_patch: trash_patch}

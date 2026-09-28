@@ -1,0 +1,33 @@
+name: Deploy to Hugging Face Space
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.10"
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: pytest -q
+
+  deploy:
+    needs: test
+    # Set the repository variable HF_SPACE (e.g. yourname/riverguard) and the secret HF_TOKEN to enable.
+    if: ${{ vars.HF_SPACE != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -U huggingface_hub
+      - run: deploy/deploy_space.sh "${{ vars.HF_SPACE }}"
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}

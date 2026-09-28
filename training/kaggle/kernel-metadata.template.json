@@ -1,0 +1,13 @@
+{
+  "id": "KAGGLE_USERNAME/riverguard-v2-train",
+  "title": "riverguard-v2-train",
+  "code_file": "train.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": ["KAGGLE_USERNAME/riverguard-v2-data"],
+  "competition_sources": [],
+  "kernel_sources": []
+}

@@ -1,0 +1,4 @@
+imagehash
+pyyaml
+requests
+python-dotenv
