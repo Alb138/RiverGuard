@@ -14,6 +14,7 @@ jobs:
         with:
           python-version: "3.10"
           cache: pip
+      - run: sudo apt-get update && sudo apt-get install -y $(cat packages.txt)  # OpenCV's system libraries
       - run: pip install -r requirements-dev.txt
       - run: pytest -q
 
