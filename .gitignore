@@ -27,3 +27,7 @@ datasets/
 weights/
 *.ts
 /yolo*.pt
+
+# Personal documents (CV contains phone number and email)
+CV*.docx
+CV*.pdf

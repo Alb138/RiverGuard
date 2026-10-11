@@ -138,3 +138,30 @@ def test_caption_and_drawing_handle_patches():
     assert "Detected: 0 items" in caption and "🧴" not in caption  # no empty breakdown line
     frame = np.zeros((480, 640, 3), np.uint8)
     assert annotate(frame, result).any()
+
+
+def test_density_score_triggers_danger_only_above_threshold():
+    from riverguard import status_text
+
+    few = [Detection(label="plastic_bottle", confidence=0.9, box=(10, 10, 50, 50))] * 2
+    dense = DetectionResult(detections=few, threshold=5, dense_score=0.87, dense_threshold=0.5)
+    assert dense.is_dense and dense.over_threshold
+    assert status_text(dense) == "DANGER: dense trash (87%) + 2 items"
+    assert "Dense trash covering the water (87% confidence)" in build_caption(dense)
+
+    unsure = DetectionResult(detections=few, threshold=5, dense_score=0.3, dense_threshold=0.5)
+    assert not unsure.is_dense and not unsure.over_threshold
+
+    no_model = DetectionResult(detections=few, threshold=5)  # dense_score None -> v1 behaviour
+    assert not no_model.is_dense and not no_model.over_threshold
+    assert "Dense trash" not in build_caption(make_result(["x"] * 9))
+
+
+@pytest.mark.skipif(not (Path(DEFAULT_MODEL_PATH).parent / "density.pt").exists(), reason="density model not present")
+def test_density_model_loads_and_scores_a_frame():
+    from riverguard import TrashDetector
+
+    detector = TrashDetector(str(DEFAULT_MODEL_PATH), density_model_path=str(Path(DEFAULT_MODEL_PATH).parent / "density.pt"))
+    assert detector.has_density and detector.density.names[detector.dense_index] == "dense"
+    result = detector.detect(np.zeros((480, 640, 3), np.uint8), threshold=5)
+    assert 0.0 <= result.dense_score <= 1.0

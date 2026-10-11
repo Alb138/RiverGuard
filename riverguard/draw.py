@@ -14,6 +14,8 @@ FONT = cv2.FONT_HERSHEY_SIMPLEX
 
 
 def status_text(result: DetectionResult) -> str:
+    if result.is_dense:
+        return f"DANGER: dense trash ({result.dense_score:.0%}) + {items(result.count)}"
     if result.patches:
         return f"DANGER: dense trash + {items(result.count)}"
     if result.over_threshold:

@@ -72,7 +72,11 @@ def alarm_metrics(detector: TrashDetector, images: list[Path], gt_danger: np.nda
     if gt_count is not None:
         out["count_mae"] = float(np.mean(np.abs(pred - gt_count)))
         out["count_bias"] = float(np.mean(pred - gt_count))  # negative = undercounting
-    out["per_image"] = [{"image": p.name, "pred": int(r.count), "patches": len(r.patches)}
+    if detector.has_density:  # how the density classifier alone would have called each scene
+        dense = np.array([r.is_dense for r in results])
+        out["dense_only_missed"] = int(np.sum(gt_danger & ~dense))
+        out["dense_only_false"] = int(np.sum(~gt_danger & dense))
+    out["per_image"] = [{"image": p.name, "pred": int(r.count), "patches": len(r.patches), "dense_score": r.dense_score}
                         for p, r in zip(images, results)]
     return out
 
@@ -87,6 +91,8 @@ def main() -> None:
     ap.add_argument("--conf", type=float, default=0.35, help="app operating confidence")
     ap.add_argument("--threshold", type=int, default=5, help="alert when count is above this")
     ap.add_argument("--tiled", action="store_true", help="also score each model with tiled inference")
+    ap.add_argument("--density", help="also score each model with this whole-photo density classifier")
+    ap.add_argument("--dense-threshold", type=float, default=0.5)
     ap.add_argument("--out", default="runs/eval/results.json")
     args = ap.parse_args()
 
@@ -103,6 +109,8 @@ def main() -> None:
     results = {}
     for weights in args.models:
         detector = TrashDetector(weights)
+        dense_detector = TrashDetector(weights, density_model_path=args.density,
+                                       dense_threshold=args.dense_threshold) if args.density else None
         row = {}
         if args.data:
             names = list(data["names"].values())
@@ -119,8 +127,14 @@ def main() -> None:
         if args.tiled:
             results[f"{weights} (tiled)"] = alarm_metrics(detector, images, gt_danger, gt_count, args.conf,
                                                           args.threshold, tiled=True)
+        if dense_detector:
+            for tiled in (False, True) if args.tiled else (False,):
+                name = f"{weights} + density{' (tiled)' if tiled else ''}"
+                results[name] = alarm_metrics(dense_detector, images, gt_danger, gt_count, args.conf,
+                                              args.threshold, tiled=tiled)
 
-    cols = ["mAP50", "mAP50-95", "count_mae", "count_bias", "decision_accuracy", "missed_alerts", "false_alerts"]
+    cols = ["mAP50", "mAP50-95", "count_mae", "count_bias", "decision_accuracy", "missed_alerts", "false_alerts",
+            "dense_only_missed", "dense_only_false"]
     cols = [c for c in cols if any(c in r for r in results.values())]
     print("| model | " + " | ".join(cols) + " |")
     print("|---" * (len(cols) + 1) + "|")

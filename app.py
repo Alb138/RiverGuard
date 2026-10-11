@@ -26,10 +26,12 @@ VIDEO_MAX_SECONDS = 20  # keep free-CPU processing time reasonable
 VIDEO_FPS = 5  # frames analysed per second of video
 
 settings = Settings.from_env()
-detector = TrashDetector(settings.model_path, conf=settings.conf_threshold)
+detector = TrashDetector(settings.model_path, conf=settings.conf_threshold,
+                         density_model_path=settings.density_model_path, dense_threshold=settings.dense_threshold)
 alerter = TelegramAlerter(settings.telegram_token, settings.telegram_chat_id, settings.alert_cooldown)
-# Models trained with the trash_patch class (see training/) also alert on dense, uncountable trash.
-PATCH_RULE = ", or when dense trash is visible" if PATCH_CLASS in detector.class_names else ""
+# With the density classifier (or a trash_patch model, see training/) the app also alerts on dense,
+# uncountable trash.
+PATCH_RULE = ", or when dense trash is visible" if detector.has_density or PATCH_CLASS in detector.class_names else ""
 EXAMPLES = sorted(str(p) for p in Path(__file__).parent.joinpath("examples").glob("*.jpg"))
 
 
@@ -50,8 +52,11 @@ def status_html(result: DetectionResult, prefix: str = "") -> str:
     )
     if result.patches:
         rows = f"<li><b>Dense trash</b> × {len(result.patches)} (too packed to count)</li>" + rows
+    if result.is_dense:
+        rows = f"<li><b>Dense trash</b> covering the water ({result.dense_score:.0%} confidence)</li>" + rows
     rows = rows or "<li>No plastic waste detected</li>"
-    headline = f"dense trash + {items(result.count)}" if result.patches else f"{prefix}{items(result.count)}"
+    dense = result.is_dense or result.patches
+    headline = f"dense trash + {items(result.count)}" if dense else f"{prefix}{items(result.count)}"
     return f"""
 <div style="border:1px solid var(--border-color-primary);border-left:6px solid {color};
             border-radius:8px;padding:12px 16px">
@@ -164,9 +169,10 @@ def analyze_video(path, conf, threshold, progress=gr.Progress()):
 
 INTRO = """
 # 🌊 RiverGuard: plastic waste detection with early-warning alerts
-A YOLO11s model fine-tuned to spot **plastic bottles, bags, packaging and other plastic** in rivers.
-When more items than the safe limit are visible, RiverGuard sends a **Telegram alert with a photo** to
-cleanup crews. This public demo shows a *preview* of that alert instead of sending it.
+A YOLO11s model fine-tuned to spot **plastic bottles, bags, packaging and other plastic** in rivers, plus a
+second model that checks whether the water is **carpeted with trash** too dense to count.
+When more items than the safe limit are visible, or the water is carpeted, RiverGuard sends a
+**Telegram alert with a photo** to cleanup crews. This public demo shows a *preview* of that alert instead of sending it.
 """
 
 with gr.Blocks(title="RiverGuard") as demo:
@@ -221,9 +227,10 @@ with gr.Blocks(title="RiverGuard") as demo:
                       stream_every=0.5, time_limit=120, concurrency_limit=4, api_name="detect_webcam")
 
     gr.Markdown(
-        "Model: YOLO11s fine-tuned on a public Roboflow river-trash dataset "
-        "(P 0.85 · R 0.72 · mAP50 0.83). "
-        "[Source code on GitHub](https://github.com/) · Originally a university group project."
+        "Models: YOLO11s item detector fine-tuned on a public Roboflow river-trash dataset "
+        "(P 0.85 · R 0.72 · mAP50 0.83), and a YOLO11s-cls dense-trash classifier "
+        "(79% correct alarms on trash-carpeted test rivers). "
+        "[Source code on GitHub](https://github.com/Alb138/RiverGuard) · Originally a university group project."
     )
 
 if __name__ == "__main__":

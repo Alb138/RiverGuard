@@ -8,7 +8,7 @@ Hugging Face Space), a local monitor CLI (`run_camera.py`) and a retraining pipe
 ```bash
 .venv/Scripts/python -m pytest -q               # tests (Windows venv, Python 3.10)
 .venv/Scripts/python app.py                     # web app on http://127.0.0.1:7860
-.venv/Scripts/python run_camera.py --source examples/canal-litter.jpg --no-show
+.venv/Scripts/python run_camera.py --source examples/versailles-pond.jpg --no-show
 .venv/Scripts/python training/evaluate.py --tags datasets/tier-b/tags.csv models/best.pt --tiled
 training/kaggle.sh kernels list --mine          # Kaggle CLI (needs Python 3.11+, lives in .venv-tools)
 ```
@@ -21,7 +21,10 @@ training/kaggle.sh kernels list --mine          # Kaggle CLI (needs Python 3.11+
   `.env.txt`; `.env.*` is ignored, so check the real filename if a key "isn't set".
 - The public Space must never get Telegram secrets: visitors only see an alert *preview*.
 - Credit teammates as "a 3-person group project", without names.
-- `models/best.pt` is v1. Replace it only when a new model beats it on all three test sets in `training/README.md`.
+- `models/best.pt` is v1 (item detector); `models/density.pt` is the v3b dense-trash classifier (threshold 0.5).
+  Replace either only when a new model beats it on the test sets in `training/README.md`, and when replacing
+  `density.pt`, copy that build's `datasets/density-*/ATTRIBUTION.md` to `training/DENSITY_ATTRIBUTION.md`.
+- Keep demo examples (`examples/`) free of trash-carpeted scenes, and check each one doesn't trigger a false alarm.
 - Images added to `examples/`, `docs/` or training data need an entry in the matching `ATTRIBUTION.md`, from a
   license that allows reuse (no NC/ND).
 

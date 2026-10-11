@@ -24,6 +24,7 @@ def build_caption(result: DetectionResult, when: datetime | None = None) -> str:
     patches = len(result.patches)
     return (
         "🚨 <b>ALERT: PLASTIC WASTE BUILD-UP</b> 🚨\n\n"
+        + (f"🟧 Dense trash covering the water ({result.dense_score:.0%} confidence)\n" if result.is_dense else "")
         + (f"🟧 Dense trash: {patches} area{'s' if patches != 1 else ''} too packed to count\n" if patches else "")
         + f"🔢 Detected: {items(result.count)}\n"
         + (f"🧴 {breakdown}\n" if breakdown else "")

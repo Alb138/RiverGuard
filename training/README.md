@@ -1,12 +1,11 @@
-# Training RiverGuard v2
+# Training RiverGuard
 
-v1 finds individual floating items well, but misses most items in dense piles and wide shots.
-v2 retrains on more varied data plus hand-labeled hard examples, and is **only shipped if it beats v1 on a
-held-out test set** of real river scenes.
+v1 finds individual floating items well, but misses most items in dense piles and wide shots. Every new model here
+is **only shipped if it beats v1 on held-out test sets** of real river scenes.
 
-> **Outcome (September 2026): v2 did not beat v1, so v1 still ships.** Tiled inference was the one measured
-> improvement, and the app now uses it for photos. The [results](#v2-results) section explains why retraining
-> didn't help and what would.
+> **Outcome (October 2026):** the item detector is still v1 (two retrains, [v2](#v2-results), didn't beat it), now
+> run with tiled inference. A separate whole-photo **dense-trash classifier** ([v3](#v3-dense-trash-classifier))
+> ships alongside it and raises alarm accuracy on trash-carpeted rivers from 36% to 79%.
 
 ```mermaid
 flowchart LR
@@ -70,6 +69,40 @@ Neither retrain moved the target metric, tier B. Two diagnoses explain why:
 **What would likely work next:** dense-trash photos from *many* different rivers (a few hundred, rather than
 51 from one). Other options are a density-regression or segmentation head instead of boxes, or a larger model
 with tiled training. The pipeline in this folder supports all of that; the bottleneck is labeled data.
+
+### v3: dense-trash classifier
+
+Instead of boxing carpets of trash, v3 adds a second, whole-photo model that answers one question: *is the water
+carpeted with trash?* One tag per photo is far cheaper to label than boxes, so it can learn from many rivers.
+
+**Data.**
+- About 9,000 candidate photos were collected (`collect_candidates.py`) from Openverse (Flickr), Wikimedia Commons
+  and labeled Roboflow Universe datasets. Only reuse-and-modify licenses were kept: CC BY, BY-SA, CC0, public domain
+  and MIT.
+- They were screened on contact sheets (`sheets.py`) into dense / scattered / clean / reject. Only about 2–4% of
+  "polluted river" search results are truly dense.
+- `build_density.py` then:
+  - caps photos per photographer
+  - drops near-duplicates and any photo resembling a test image
+  - splits by **photographer**, so the held-out test ("tier C") checks generalization to photographers and rivers
+    it never saw.
+- Training is `kaggle/train_density.ipynb`: YOLO11s-cls at 384 px. The alert threshold is chosen on the validation
+  photographers only.
+
+| Alarm = items > 5 **or** dense | Tier B (66, 50 dense) | Tier C (108, 10 dense) | Tier A (17) | In-domain (273) |
+|---|---|---|---|---|
+| v1 + tiling (no dense check) | 36.4% · 42 missed · 0 false | 91.7% · 9 missed · 0 false | 94.1% · 0 false | 96.3% · 5 false |
+| **+ v3b** (shipped): 79 dense / 876 not, 129 photographers | **78.8% · 14 missed · 0 false** | **97.2% · 1 missed** · 2 false | 88.2% · 1 false | 93.8% · 12 false |
+| + v3c: 102 dense / 1,045 not, 230 photographers | 69.7% · 19 missed · 1 false | 94.4% · 6 missed · **0 false** | **94.1% · 0 false** | 94.9% · 9 false |
+
+v3a (the first run) found the failure mode: close-ups of a single item on cluttered ground were called "dense". v3b
+fixed most of it with ~180 close-up negatives and 4× oversampled dense photos.
+
+v3c added ~120 more photographers, including clean Jakarta and Ciliwung rivers and ~800 close-ups. It became more
+**cautious rather than better**: fewer false alarms, but it missed more real carpets, catching only 4 of 10 on
+unseen photographers. v3b ships because a missed blockage is the costly error for an early-warning system. Its one
+shortfall against the ship criteria is in-domain accuracy, 2.5 points below v1 instead of ≤ 1. The next step is
+more *dense* examples from varied rivers; more negatives alone won't help.
 
 ## Setup
 

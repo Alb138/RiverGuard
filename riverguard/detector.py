@@ -29,10 +29,18 @@ class Detection:
 class DetectionResult:
     detections: list[Detection]
     threshold: int
+    # Probability from the optional whole-photo density classifier that the water is carpeted with
+    # trash (None when no density model is loaded).
+    dense_score: float | None = None
+    dense_threshold: float = 0.5
 
     @property
     def patches(self) -> list[Detection]:
         return [d for d in self.detections if d.is_patch]
+
+    @property
+    def is_dense(self) -> bool:
+        return self.dense_score is not None and self.dense_score >= self.dense_threshold
 
     @property
     def count(self) -> int:
@@ -41,7 +49,7 @@ class DetectionResult:
 
     @property
     def over_threshold(self) -> bool:
-        return is_over_threshold(self.count, self.threshold) or bool(self.patches)
+        return is_over_threshold(self.count, self.threshold) or bool(self.patches) or self.is_dense
 
     @property
     def per_class(self) -> dict[str, int]:
@@ -105,10 +113,24 @@ def merge_boxes(boxes: np.ndarray, scores: np.ndarray, ios_thresh: float = 0.6) 
     return keep
 
 
+DENSE_CLASS = "dense"  # the density classifier's positive class (its other class is "not_dense")
+
+
 class TrashDetector:
-    def __init__(self, model_path: str, conf: float = 0.35):
+    def __init__(self, model_path: str, conf: float = 0.35, density_model_path: str | None = None,
+                 dense_threshold: float = 0.5):
         self.model = YOLO(model_path)
         self.conf = conf
+        self.density = YOLO(density_model_path, task="classify") if density_model_path else None
+        self.dense_index = next((i for i, n in self.density.names.items() if n == DENSE_CLASS), None) \
+            if self.density else None
+        if self.density is not None and self.dense_index is None:
+            raise ValueError(f"{density_model_path} has no '{DENSE_CLASS}' class: {self.density.names}")
+        self.dense_threshold = dense_threshold
+
+    @property
+    def has_density(self) -> bool:
+        return self.density is not None
 
     @property
     def class_names(self) -> list[str]:
@@ -150,4 +172,12 @@ class TrashDetector:
                       box=tuple(int(v) for v in boxes[i]))
             for i in keep
         ]
-        return DetectionResult(detections=detections, threshold=threshold)
+        return DetectionResult(detections=detections, threshold=threshold, dense_score=self.dense_score(frame_bgr),
+                               dense_threshold=self.dense_threshold)
+
+    def dense_score(self, frame_bgr: np.ndarray) -> float | None:
+        """P(water carpeted with trash) for the whole frame, or None without a density model."""
+        if self.density is None:
+            return None
+        probs = self.density(frame_bgr, verbose=False)[0].probs
+        return float(probs.data[self.dense_index])

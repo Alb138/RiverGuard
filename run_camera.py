@@ -2,7 +2,7 @@
 
     python run_camera.py --source 0                  # default webcam
     python run_camera.py --source river.mp4
-    python run_camera.py --source examples/canal-litter.jpg --threshold 3
+    python run_camera.py --source examples/versailles-pond.jpg --threshold 3
     python run_camera.py --source rtsp://... --no-show  # headless, e.g. on a server next to a CCTV
 """
 
@@ -25,6 +25,8 @@ def parse_args(settings: Settings) -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--source", default="0", help="webcam index, video/image path, or stream URL (default: 0)")
     p.add_argument("--model", default=settings.model_path)
+    p.add_argument("--density-model", default=settings.density_model_path,
+                   help="whole-photo dense-trash classifier (default: models/density.pt if present)")
     p.add_argument("--conf", type=float, default=settings.conf_threshold, help="detection confidence")
     p.add_argument("--threshold", type=int, default=settings.alert_threshold,
                    help="alert when more than this many items are visible")
@@ -95,7 +97,8 @@ def main() -> None:
     args = parse_args(settings)
 
     log.info("Loading model %s", args.model)
-    detector = TrashDetector(args.model, conf=args.conf)
+    detector = TrashDetector(args.model, conf=args.conf, density_model_path=args.density_model,
+                             dense_threshold=settings.dense_threshold)
     alerter = TelegramAlerter(settings.telegram_token, settings.telegram_chat_id, args.cooldown)
     if not alerter.enabled:
         log.info("TELEGRAM_TOKEN / TELEGRAM_CHAT_ID not set: running without alerts (see .env.example)")
