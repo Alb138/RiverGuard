@@ -7,6 +7,9 @@ second model checks whether the water is carpeted with trash too dense to count.
 the limit, it sends a Telegram alert with an evidence photo so cleanup crews can act *before* the build-up blocks a
 floodgate.
 
+**[▶ Try the live demo](https://riverguard.streamlit.app/)** (free hosting: if it has been idle, click the wake-up
+button and give it about a minute)
+
 <p align="center">
   <img src="docs/demo-detection.jpg" width="58%" alt="RiverGuard detecting plastic bottles and bags in a river">
   <img src="docs/telegram-alert.png" width="40%" alt="Telegram alert sent by the RiverGuard bot">
@@ -125,8 +128,8 @@ tests/             pytest suite (pytest -q)
 
 ## Deployment
 
-The live demo is [`demo/streamlit_app.py`](demo/streamlit_app.py) on the free
-[Streamlit Community Cloud](https://streamlit.io/cloud), which redeploys it on every push to `main`. It installs only
+The [live demo](https://riverguard.streamlit.app/) is [`demo/streamlit_app.py`](demo/streamlit_app.py) on the free
+[Streamlit Community Cloud](https://streamlit.io/cloud), which updates it on every push to `main`. It installs only
 [`demo/requirements.txt`](demo/requirements.txt): no PyTorch, because it runs ONNX exports of both models on plain
 onnxruntime ([`riverguard/backends.py`](riverguard/backends.py)), which uses far less memory and starts faster.
 The [tests](.github/workflows/tests.yml) check that the exports give the same boxes and scores as the `.pt` models,

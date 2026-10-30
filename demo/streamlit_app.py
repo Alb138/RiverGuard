@@ -7,6 +7,7 @@ alerts: visitors only see a preview. For real alerts, run app.py locally.
     streamlit run demo/streamlit_app.py
 """
 
+import hashlib
 import io
 import os
 import sys
@@ -23,6 +24,28 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))  # Streamlit only puts this file's folder on the import path
 os.environ.setdefault("RIVERGUARD_THREADS", "2")  # the free tier gives at most 2 cores; more threads just wait
 
+
+def code_version() -> str:
+    """Changes whenever the detection code or a model changes.
+
+    Streamlit Cloud updates a running app's files in place after a push, but only reloads modules in this folder,
+    and its caches can't see inside imported code. Without this, the app kept serving the old detector's results."""
+    h = hashlib.sha1()
+    for path in sorted((ROOT / "riverguard").glob("*.py")):
+        h.update(path.read_bytes())
+    for path in sorted((ROOT / "models").glob("*.onnx")):
+        h.update(f"{path.name}:{path.stat().st_size}:{path.stat().st_mtime_ns}".encode())
+    return h.hexdigest()[:12]
+
+
+VERSION = code_version()
+if getattr(sys.modules.get("riverguard"), "demo_version", VERSION) != VERSION:
+    for name in [n for n in sys.modules if n.split(".")[0] == "riverguard"]:
+        del sys.modules[name]  # the code changed under the running app: import it afresh below
+
+import riverguard  # noqa: E402
+
+riverguard.demo_version = VERSION
 from riverguard import DetectionResult, Settings, TrashDetector, annotate  # noqa: E402
 from riverguard.detector import MAX_SIDE, fit_within  # noqa: E402
 from riverguard.web import FOOTER, INTRO, alert_preview_html, alert_rule, annotate_video, status_html  # noqa: E402
@@ -39,8 +62,8 @@ PREVIEW_NOTE = "👀 Demo mode: this is a preview of the Telegram alert. The pub
 st.set_page_config(page_title="RiverGuard", page_icon="🌊", layout="wide")
 
 
-@st.cache_resource(show_spinner="Loading the models…")
-def load_models() -> tuple[TrashDetector, threading.Lock]:
+@st.cache_resource(max_entries=1, show_spinner="Loading the models…")  # a new version replaces the old detector
+def load_models(version: str) -> tuple[TrashDetector, threading.Lock]:
     detector = TrashDetector(str(ROOT / "models" / "best.onnx"), conf=DEFAULTS.conf_threshold,
                              density_model_path=str(ROOT / "models" / "density.onnx"),
                              dense_threshold=DEFAULTS.dense_threshold)
@@ -48,7 +71,7 @@ def load_models() -> tuple[TrashDetector, threading.Lock]:
 
 
 def detect(frame_bgr: np.ndarray, threshold: int, conf: float, tiled: bool = False) -> DetectionResult:
-    detector, lock = load_models()
+    detector, lock = load_models(VERSION)
     with lock:
         return detector.detect(frame_bgr, threshold, conf, tiled=tiled)
 
@@ -61,8 +84,9 @@ def decode(data: bytes) -> np.ndarray:
 
 
 @st.cache_data(max_entries=64, show_spinner="Looking for plastic…")
-def analyze(data: bytes, conf: float, threshold: int, tiled: bool) -> tuple[np.ndarray, DetectionResult]:
-    """Annotated BGR frame and result. Cached across visitors, so the examples are instant after the first run."""
+def analyze(data: bytes, conf: float, threshold: int, tiled: bool, version: str) -> tuple[np.ndarray, DetectionResult]:
+    """Annotated BGR frame and result. Cached across visitors, so the examples are instant after the first run.
+    `version` keeps results from older code out of the cache."""
     frame = decode(data)
     result = detect(frame, threshold, conf, tiled=tiled)
     return annotate(frame, result), result
@@ -88,7 +112,7 @@ def choose_upload() -> None:
         st.session_state.example = None  # so clicking an example switches back to it
 
 
-RULE = alert_rule(load_models()[0])
+RULE = alert_rule(load_models(VERSION)[0])
 if "image" not in st.session_state:
     st.session_state.example = FIRST_EXAMPLE.name
     choose_example()
@@ -114,7 +138,7 @@ with image_tab:
                                      "items keep enough pixels to be recognised.")
         name, data = st.session_state.image
         try:
-            annotated, result = analyze(data, conf, threshold, tiled)
+            annotated, result = analyze(data, conf, threshold, tiled, VERSION)
         except Exception:  # noqa: BLE001 - a broken upload should not take the page down
             right.error(f"Could not read {name} as an image.")
         else:
@@ -164,7 +188,7 @@ with camera_tab:
             with left:
                 shot = st.camera_input("Webcam", label_visibility="collapsed")
             if shot is not None:
-                annotated, result = analyze(shot.getvalue(), conf, threshold, False)
+                annotated, result = analyze(shot.getvalue(), conf, threshold, False, VERSION)
                 show_result(annotated, result, right)
 
 st.divider()
