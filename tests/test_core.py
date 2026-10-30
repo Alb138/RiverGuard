@@ -119,6 +119,36 @@ def test_merge_boxes_drops_partial_duplicates_but_keeps_neighbours():
     assert sorted(merge_boxes(boxes, scores)) == [0, 2]
 
 
+def test_cut_by_tile_edge_only_flags_inner_edges():
+    from riverguard.detector import cut_by_tile_edge
+
+    boxes = np.array([
+        [500, 100, 640, 200],  # touches the tile's right edge
+        [0, 100, 80, 200],  # touches the tile's left edge
+        [100, 100, 200, 200],  # fully inside
+    ], dtype=float)
+    # Left tile of a 1280 px wide image: its right edge is inside the image, its left edge is the image border.
+    assert cut_by_tile_edge(boxes, (640, 640), (0, 0), (640, 1280)).tolist() == [True, False, False]
+    # Right-most tile: the opposite.
+    assert cut_by_tile_edge(boxes, (640, 640), (640, 0), (640, 1280)).tolist() == [False, True, False]
+
+
+@pytest.mark.skipif(not Path(DEFAULT_MODEL_PATH).exists(), reason="model weights not present")
+@pytest.mark.parametrize("example, expected", [
+    ("danube-bottle.jpg", 1),  # one long bottle: tiles once split it into two "bottles"
+    ("versailles-pond.jpg", 3),  # a tile once saw a "bottle" in the palace behind the pond
+])
+def test_tiling_does_not_add_fragments_or_edge_artifacts(example, expected):
+    import cv2
+
+    from riverguard import TrashDetector
+    from riverguard.detector import fit_within
+
+    detector = TrashDetector(str(DEFAULT_MODEL_PATH))
+    frame = fit_within(cv2.imread(str(Path(__file__).parent.parent / "examples" / example)))
+    assert detector.detect(frame, 5, tiled=True).count == expected
+
+
 def test_dense_patch_triggers_danger_and_is_not_counted_as_an_item():
     from riverguard import status_text
 

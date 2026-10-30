@@ -34,8 +34,9 @@ flowchart LR
 ```
 
 1. Each frame is run through the detector (confidence ≥ 0.35 by default). Large photos are also scanned as
-   overlapping 640 px tiles, so small, distant items keep enough pixels to be recognised. Duplicate boxes where
-   tiles overlap are merged.
+   overlapping 640 px tiles, so small, distant items keep enough pixels to be recognised. A box cut off by a
+   tile's edge is dropped, because the full frame or the neighbouring tile sees that item whole, and duplicate
+   boxes where tiles overlap are merged.
 2. The whole frame also goes through a small classifier that answers one question: *is the water carpeted with
    trash?* That catches scenes where items are packed too tightly for the detector to count.
 3. Detections are counted per class and drawn on the frame with a SAFE / DANGER status banner.

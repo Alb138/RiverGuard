@@ -91,11 +91,22 @@ def tile_origins(h: int, w: int, size: int = TILE, overlap: float = TILE_OVERLAP
     return [(x, y) for y in axis(h) for x in axis(w)]
 
 
+def cut_by_tile_edge(boxes: np.ndarray, crop_hw: tuple[int, int], origin: tuple[int, int],
+                     image_hw: tuple[int, int], tol: float = 2) -> np.ndarray:
+    """Which tile boxes (in tile coordinates) touch an edge where the tile ends but the image goes on.
+
+    Such an object is only partly inside the tile, so its box is a fragment: one bottle cut in two by a tile
+    edge came back as two "bottles". The full frame or the overlapping neighbour tile sees more of it."""
+    (ch, cw), (ox, oy), (h, w) = crop_hw, origin, image_hw
+    return (((ox > 0) & (boxes[:, 0] <= tol)) | ((oy > 0) & (boxes[:, 1] <= tol))
+            | ((ox + cw < w) & (boxes[:, 2] >= cw - tol)) | ((oy + ch < h) & (boxes[:, 3] >= ch - tol)))
+
+
 def merge_boxes(boxes: np.ndarray, scores: np.ndarray, ios_thresh: float = 0.6) -> list[int]:
     """Greedy, class-agnostic suppression by intersection-over-smaller-box.
 
-    Plain IoU misses the duplicates tiling creates: a bottle cut by a tile edge yields a small partial
-    box inside the full one. Intersection over the smaller box catches those."""
+    Plain IoU misses the duplicates tiling creates: a tile may box only part of an item that another
+    pass boxes whole, and that small box sits inside the big one. Intersection over the smaller box catches it."""
     order = np.argsort(-scores)
     areas = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
     keep: list[int] = []
@@ -146,6 +157,7 @@ class TrashDetector:
 
         With `tiled=True`, frames much larger than the model's 640 px input are also scanned as
         overlapping 640 px tiles, so small, distant items keep enough pixels to be recognised.
+        Tile boxes cut off by an inner tile edge are dropped, and duplicates are merged.
         """
         conf = self.conf if conf is None else conf
         h, w = frame_bgr.shape[:2]
@@ -156,7 +168,11 @@ class TrashDetector:
                 offsets.append((x, y))
 
         boxes, scores, classes = [], [], []
-        for (xyxy, crop_scores, crop_classes), (ox, oy) in zip(self.model.predict(crops, conf), offsets):
+        predictions = self.model.predict(crops, conf)
+        for i, ((xyxy, crop_scores, crop_classes), (ox, oy)) in enumerate(zip(predictions, offsets)):
+            if i > 0:  # a tile (crop 0 is the full frame)
+                whole = ~cut_by_tile_edge(xyxy, crops[i].shape[:2], (ox, oy), (h, w))
+                xyxy, crop_scores, crop_classes = xyxy[whole], crop_scores[whole], crop_classes[whole]
             boxes.append(xyxy + np.array([ox, oy, ox, oy], dtype=xyxy.dtype))
             scores.append(crop_scores)
             classes.append(crop_classes)
