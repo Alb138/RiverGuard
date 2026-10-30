@@ -1,4 +1,4 @@
-# CPU-only PyTorch wheels keep the install small (and are what the free HF Space runs on).
+# CPU-only PyTorch wheels keep the install small. (The public demo skips PyTorch: see demo/requirements.txt.)
 # For a local NVIDIA GPU, install torch from https://pytorch.org first and drop this line.
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch

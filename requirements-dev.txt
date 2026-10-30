@@ -1,3 +1,4 @@
 -r requirements.txt
 -r training/requirements.txt
+onnxruntime  # tests that the ONNX exports the live demo runs still match the .pt models
 pytest

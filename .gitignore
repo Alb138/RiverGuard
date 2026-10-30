@@ -31,3 +31,4 @@ weights/
 # Personal documents (CV contains phone number and email)
 CV*.docx
 CV*.pdf
+.streamlit/secrets.toml

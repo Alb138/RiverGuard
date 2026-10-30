@@ -1,0 +1,32 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.10"
+          cache: pip
+      - run: sudo apt-get update && sudo apt-get install -y libgl1 libglib2.0-0  # OpenCV's system libraries
+      - run: pip install -r requirements-dev.txt
+      - run: pytest -q
+
+  # The hosted demo, with exactly the packages Streamlit Community Cloud installs (no PyTorch).
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r demo/requirements.txt pytest
+      - run: pytest -q tests/test_demo.py

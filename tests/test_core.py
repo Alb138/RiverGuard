@@ -165,3 +165,29 @@ def test_density_model_loads_and_scores_a_frame():
     assert detector.has_density and detector.density.names[detector.dense_index] == "dense"
     result = detector.detect(np.zeros((480, 640, 3), np.uint8), threshold=5)
     assert 0.0 <= result.dense_score <= 1.0
+
+
+MODELS = Path(DEFAULT_MODEL_PATH).parent
+
+
+@pytest.mark.skipif(not all((MODELS / f).exists() for f in ("best.pt", "density.pt", "best.onnx", "density.onnx")),
+                    reason="model weights not present")
+def test_onnx_exports_match_pytorch_models():
+    """The hosted demo runs the .onnx exports. They must give the same answers as the .pt models
+    (re-export both after replacing a .pt, see riverguard/backends.py)."""
+    pytest.importorskip("onnxruntime")
+    import cv2
+
+    from riverguard import TrashDetector
+    from riverguard.detector import fit_within
+
+    pt = TrashDetector(str(MODELS / "best.pt"), density_model_path=str(MODELS / "density.pt"))
+    onnx = TrashDetector(str(MODELS / "best.onnx"), density_model_path=str(MODELS / "density.onnx"))
+    assert onnx.class_names == pt.class_names
+    frame = fit_within(cv2.imread(str(Path(__file__).parent.parent / "examples" / "river-bank-bottles.jpg")))
+    for tiled in (False, True):
+        a, b = pt.detect(frame, 5, tiled=tiled), onnx.detect(frame, 5, tiled=tiled)
+        assert a.count > 5 and b.per_class == a.per_class
+        boxes_a, boxes_b = (np.array(sorted(d.box for d in r.detections)) for r in (a, b))
+        assert np.abs(boxes_a - boxes_b).max() <= 1  # pixels
+        assert b.dense_score == pytest.approx(a.dense_score, abs=1e-3)

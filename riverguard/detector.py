@@ -5,7 +5,8 @@ from dataclasses import dataclass
 
 import cv2
 import numpy as np
-from ultralytics import YOLO
+
+from .backends import load_classifier, load_detector
 
 MAX_SIDE = 1280  # the app downscales larger inputs to this before detection
 
@@ -117,11 +118,14 @@ DENSE_CLASS = "dense"  # the density classifier's positive class (its other clas
 
 
 class TrashDetector:
+    """Item detector plus optional density classifier. Each model is a .pt checkpoint (runs on Ultralytics/PyTorch)
+    or an .onnx export (runs on onnxruntime alone, see riverguard/backends.py)."""
+
     def __init__(self, model_path: str, conf: float = 0.35, density_model_path: str | None = None,
                  dense_threshold: float = 0.5):
-        self.model = YOLO(model_path)
+        self.model = load_detector(model_path)
         self.conf = conf
-        self.density = YOLO(density_model_path, task="classify") if density_model_path else None
+        self.density = load_classifier(density_model_path) if density_model_path else None
         self.dense_index = next((i for i, n in self.density.names.items() if n == DENSE_CLASS), None) \
             if self.density else None
         if self.density is not None and self.dense_index is None:
@@ -152,11 +156,10 @@ class TrashDetector:
                 offsets.append((x, y))
 
         boxes, scores, classes = [], [], []
-        for result, (ox, oy) in zip(self.model(crops, conf=conf, verbose=False), offsets):
-            xyxy = result.boxes.xyxy.cpu().numpy()
+        for (xyxy, crop_scores, crop_classes), (ox, oy) in zip(self.model.predict(crops, conf), offsets):
             boxes.append(xyxy + np.array([ox, oy, ox, oy], dtype=xyxy.dtype))
-            scores.append(result.boxes.conf.cpu().numpy())
-            classes.append(result.boxes.cls.cpu().numpy())
+            scores.append(crop_scores)
+            classes.append(crop_classes)
         boxes, scores, classes = np.concatenate(boxes), np.concatenate(scores), np.concatenate(classes)
         if len(crops) > 1:
             # Merge patches and items separately: an item inside a patch is not a duplicate of it.
@@ -179,5 +182,4 @@ class TrashDetector:
         """P(water carpeted with trash) for the whole frame, or None without a density model."""
         if self.density is None:
             return None
-        probs = self.density(frame_bgr, verbose=False)[0].probs
-        return float(probs.data[self.dense_index])
+        return float(self.density.probs(frame_bgr)[self.dense_index])

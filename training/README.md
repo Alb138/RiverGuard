@@ -140,4 +140,5 @@ py -3.13 -m venv .venv-tools && .venv-tools/Scripts/pip install kaggle   # Kaggl
    ```
    The alarm columns are what matter for the product: `decision_accuracy` (SAFE/DANGER called correctly),
    `missed_alerts` (DANGER scenes called SAFE, the costly error) and `count_mae`.
-6. If v2 wins, replace `models/best.pt`, update the model card in the main README, and push. CI redeploys the Space.
+6. If v2 wins, replace `models/best.pt`, re-export `models/best.onnx` (command in the main README's Deployment
+   section), update the model card in the main README, and push. Streamlit Cloud redeploys the demo.

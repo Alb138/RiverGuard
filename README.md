@@ -7,8 +7,6 @@ second model checks whether the water is carpeted with trash too dense to count.
 the limit, it sends a Telegram alert with an evidence photo so cleanup crews can act *before* the build-up blocks a
 floodgate.
 
-**[▶ Live demo on Hugging Face](https://huggingface.co/spaces/Alb138/riverguard)**
-
 <p align="center">
   <img src="docs/demo-detection.jpg" width="58%" alt="RiverGuard detecting plastic bottles and bags in a river">
   <img src="docs/telegram-alert.png" width="40%" alt="Telegram alert sent by the RiverGuard bot">
@@ -96,7 +94,7 @@ python run_camera.py --source rtsp://camera/stream --no-show   # headless next t
 
 Press `q` to quit. Run `python run_camera.py --help` for all options.
 
-**Web app** (the same app that runs on Hugging Face):
+**Web app** (Gradio; sends real alerts if configured, unlike the public demo):
 
 ```bash
 python app.py        # then open http://127.0.0.1:7860
@@ -114,24 +112,42 @@ Without these, everything still runs. Alerts are skipped, and the web app shows 
 ## Project structure
 
 ```
-riverguard/        core package: config, detector, drawing, Telegram alerts
+riverguard/        core package: config, detector + model runtimes, drawing, Telegram alerts, web helpers
 run_camera.py      local monitor CLI (webcam / video / image / RTSP)
-app.py             Gradio web app (Hugging Face Space entrypoint)
-models/            best.pt (item detector) + density.pt (dense-trash check)
+app.py             Gradio web app (local, with real alerts)
+demo/              the public demo: Streamlit app + its slim requirements
+models/            best.pt (item detector) + density.pt (dense-trash check), and their ONNX exports
 examples/          sample images (see examples/ATTRIBUTION.md)
-deploy/            Hugging Face Space deploy script + Space card
 training/          data collection, labeling tools, dataset builders, Kaggle notebooks, evaluation
 tests/             pytest suite (pytest -q)
 ```
 
 ## Deployment
 
-The live demo is a free CPU Hugging Face Space. Every push to `main` runs the tests and redeploys it
-([workflow](.github/workflows/deploy-space.yml)) when the `HF_SPACE` repository variable and `HF_TOKEN` secret are set.
-To deploy by hand, run `hf auth login` and then `deploy/deploy_space.sh Alb138/riverguard`.
+The live demo is [`demo/streamlit_app.py`](demo/streamlit_app.py) on the free
+[Streamlit Community Cloud](https://streamlit.io/cloud), which redeploys it on every push to `main`. It installs only
+[`demo/requirements.txt`](demo/requirements.txt): no PyTorch, because it runs ONNX exports of both models on plain
+onnxruntime ([`riverguard/backends.py`](riverguard/backends.py)), which uses far less memory and starts faster.
+The [tests](.github/workflows/tests.yml) check that the exports give the same boxes and scores as the `.pt` models,
+and load the demo page with exactly the packages the cloud installs. After 12 hours without visitors the app goes to
+sleep; the next visitor wakes it with one click, which takes about a minute.
 
-The public Space intentionally has **no** Telegram secrets, so visitors see an alert preview and never message a real
-chat.
+To run the demo locally (Python 3.11+):
+
+```bash
+pip install -r demo/requirements.txt
+streamlit run demo/streamlit_app.py
+```
+
+After replacing a model, re-export the ONNX files (needs the full `requirements.txt` plus `pip install onnx onnxslim`):
+
+```bash
+python -c "from ultralytics import YOLO; YOLO('models/best.pt').export(format='onnx', dynamic=True, simplify=True)"
+python -c "from ultralytics import YOLO; YOLO('models/density.pt').export(format='onnx', imgsz=384, simplify=True)"
+```
+
+The public demo never sends Telegram alerts (it doesn't read credentials at all), so visitors see an alert preview
+and never message a real chat.
 
 ## Limitations & next steps
 

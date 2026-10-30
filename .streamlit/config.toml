@@ -1,0 +1,8 @@
+[server]
+maxUploadSize = 100  # MB: enough for a short phone video (only its first seconds are analysed)
+
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "viewer"  # visitors don't need the developer menu

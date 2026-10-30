@@ -1,0 +1,10 @@
+# Hosted demo (Streamlit Community Cloud picks up this file because it sits next to streamlit_app.py).
+# The ONNX models run on onnxruntime, so no PyTorch: much less memory and a faster start.
+streamlit>=1.66,<2
+onnxruntime>=1.23,<2
+opencv-python-headless>=4.10
+numpy>=2.0
+pillow
+requests
+python-dotenv
+imageio-ffmpeg  # bundled ffmpeg for browser-playable (H.264) annotated videos
