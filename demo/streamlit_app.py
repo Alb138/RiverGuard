@@ -39,9 +39,9 @@ def code_version() -> str:
 
 
 VERSION = code_version()
-if getattr(sys.modules.get("riverguard"), "demo_version", VERSION) != VERSION:
+if "riverguard" in sys.modules and getattr(sys.modules["riverguard"], "demo_version", None) != VERSION:
     for name in [n for n in sys.modules if n.split(".")[0] == "riverguard"]:
-        del sys.modules[name]  # the code changed under the running app: import it afresh below
+        del sys.modules[name]  # the code changed under the running app (or predates this check): import it afresh
 
 import riverguard  # noqa: E402
 
