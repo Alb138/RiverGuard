@@ -136,8 +136,7 @@ with gr.Blocks(title="RiverGuard") as demo:
                       concurrency_limit=1, api_name="detect_video")
 
     with gr.Tab("Webcam"):
-        gr.Markdown("Point your camera at some plastic bottles or bags (a photo on another screen works too). "
-                    "Faces are ignored: the model only learned rivers, so it used to mistake them for trash.")
+        gr.Markdown("Point your camera at some plastic bottles or bags (a photo on another screen works too).")
         with gr.Row():
             cam_in = gr.Image(sources=["webcam"], streaming=True, type="numpy", label="Webcam")
             with gr.Column():

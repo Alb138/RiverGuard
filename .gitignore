@@ -32,3 +32,10 @@ weights/
 CV*.docx
 CV*.pdf
 .streamlit/secrets.toml
+
+# Local test videos (often stock footage that may not be redistributed)
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm

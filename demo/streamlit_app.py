@@ -183,8 +183,7 @@ with video_tab:
 
 with camera_tab:
     if camera_tab.open:
-        st.markdown("Take a photo of some plastic bottles or bags (a photo on another screen works too). "
-                    "Faces are ignored: the model only learned rivers, so it used to mistake them for trash.")
+        st.markdown("Take a photo of some plastic bottles or bags (a photo on another screen works too).")
         if st.toggle("Turn on the camera"):
             left, right = st.columns(2)
             with left:
