@@ -9,6 +9,8 @@ from riverguard import Detection, DetectionResult, TelegramAlerter, annotate, bu
 from riverguard.alerts import Cooldown
 from riverguard.config import DEFAULT_MODEL_PATH
 
+MODELS = Path(DEFAULT_MODEL_PATH).parent
+
 
 def make_result(labels, threshold=5):
     dets = [Detection(label=l, confidence=0.9, box=(10, 10, 50, 50)) for l in labels]
@@ -133,6 +135,33 @@ def test_cut_by_tile_edge_only_flags_inner_edges():
     assert cut_by_tile_edge(boxes, (640, 640), (640, 0), (640, 1280)).tolist() == [False, True, False]
 
 
+def test_covers_face_needs_most_of_a_face_inside_the_box():
+    from riverguard.detector import covers_face
+
+    faces = np.array([[100, 100, 200, 200]], dtype=float)
+    assert covers_face((90, 80, 220, 260), faces)  # a "trash" box around a head
+    assert not covers_face((180, 150, 260, 300), faces)  # a bottle held next to the chin
+    assert not covers_face((90, 80, 220, 260), np.zeros((0, 4)))  # no faces
+
+
+@pytest.mark.skipif(not (MODELS / "face_detection_yunet_2023mar.onnx").exists(), reason="face model not present")
+def test_face_filter_drops_boxes_on_faces():
+    import cv2
+
+    from riverguard import TrashDetector
+    from riverguard.detector import fit_within
+
+    detector = TrashDetector(str(MODELS / "best.onnx"),
+                             face_model_path=str(MODELS / "face_detection_yunet_2023mar.onnx"))
+    assert len(detector.faces(np.zeros((480, 640, 3), np.uint8))) == 0  # the real face model loads and runs
+    frame = fit_within(cv2.imread(str(Path(__file__).parent.parent / "examples" / "danube-bottle.jpg")))
+    assert detector.detect(frame, 5).count == 1  # the river photo has no face, so nothing is filtered
+    (bottle,) = detector.detect(frame, 5).detections
+    x1, y1, x2, y2 = bottle.box
+    detector.faces = lambda image: np.array([[x1 + 10, y1 + 10, x1 + 60, y1 + 60]], dtype=float)  # a "face" on it
+    assert detector.detect(frame, 5).count == 0
+
+
 @pytest.mark.skipif(not Path(DEFAULT_MODEL_PATH).exists(), reason="model weights not present")
 @pytest.mark.parametrize("example, expected", [
     ("danube-bottle.jpg", 1),  # one long bottle: tiles once split it into two "bottles"
@@ -195,9 +224,6 @@ def test_density_model_loads_and_scores_a_frame():
     assert detector.has_density and detector.density.names[detector.dense_index] == "dense"
     result = detector.detect(np.zeros((480, 640, 3), np.uint8), threshold=5)
     assert 0.0 <= result.dense_score <= 1.0
-
-
-MODELS = Path(DEFAULT_MODEL_PATH).parent
 
 
 @pytest.mark.skipif(not all((MODELS / f).exists() for f in ("best.pt", "density.pt", "best.onnx", "density.onnx")),

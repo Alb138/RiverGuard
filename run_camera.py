@@ -27,6 +27,9 @@ def parse_args(settings: Settings) -> argparse.Namespace:
     p.add_argument("--model", default=settings.model_path)
     p.add_argument("--density-model", default=settings.density_model_path,
                    help="whole-photo dense-trash classifier (default: models/density.pt if present)")
+    p.add_argument("--face-model", default=settings.face_model_path,
+                   help="face detector whose faces are never counted as trash "
+                        "(default: models/face_detection_yunet_2023mar.onnx if present)")
     p.add_argument("--conf", type=float, default=settings.conf_threshold, help="detection confidence")
     p.add_argument("--threshold", type=int, default=settings.alert_threshold,
                    help="alert when more than this many items are visible")
@@ -98,7 +101,7 @@ def main() -> None:
 
     log.info("Loading model %s", args.model)
     detector = TrashDetector(args.model, conf=args.conf, density_model_path=args.density_model,
-                             dense_threshold=settings.dense_threshold)
+                             dense_threshold=settings.dense_threshold, face_model_path=args.face_model)
     alerter = TelegramAlerter(settings.telegram_token, settings.telegram_chat_id, args.cooldown)
     if not alerter.enabled:
         log.info("TELEGRAM_TOKEN / TELEGRAM_CHAT_ID not set: running without alerts (see .env.example)")

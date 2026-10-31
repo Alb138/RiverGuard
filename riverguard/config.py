@@ -9,21 +9,23 @@ from dotenv import load_dotenv
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_MODEL_PATH = ROOT / "models" / "best.pt"
 DEFAULT_DENSITY_PATH = ROOT / "models" / "density.pt"  # optional whole-photo "dense trash" classifier
+DEFAULT_FACE_PATH = ROOT / "models" / "face_detection_yunet_2023mar.onnx"  # optional: ignore boxes on faces
 
 load_dotenv(ROOT / ".env")
 
 
-def _default_density() -> str | None:
-    env = os.getenv("RIVERGUARD_DENSITY_MODEL")
+def _optional_model(env_name: str, default: Path) -> str | None:
+    env = os.getenv(env_name)
     if env is not None:
-        return env or None  # set it to an empty string to disable the density check
-    return str(DEFAULT_DENSITY_PATH) if DEFAULT_DENSITY_PATH.exists() else None
+        return env or None  # set it to an empty string to turn the model off
+    return str(default) if default.exists() else None
 
 
 @dataclass(frozen=True)
 class Settings:
     model_path: str = str(DEFAULT_MODEL_PATH)
     density_model_path: str | None = None
+    face_model_path: str | None = None
     conf_threshold: float = 0.35  # minimum YOLO confidence for a detection to count
     alert_threshold: int = 5  # alert when MORE than this many items are visible
     dense_threshold: float = 0.5  # alert when the density classifier is at least this sure
@@ -35,7 +37,8 @@ class Settings:
     def from_env(cls) -> "Settings":
         return cls(
             model_path=os.getenv("RIVERGUARD_MODEL", str(DEFAULT_MODEL_PATH)),
-            density_model_path=_default_density(),
+            density_model_path=_optional_model("RIVERGUARD_DENSITY_MODEL", DEFAULT_DENSITY_PATH),
+            face_model_path=_optional_model("RIVERGUARD_FACE_MODEL", DEFAULT_FACE_PATH),
             conf_threshold=float(os.getenv("RIVERGUARD_CONF", cls.conf_threshold)),
             alert_threshold=int(os.getenv("RIVERGUARD_THRESHOLD", cls.alert_threshold)),
             dense_threshold=float(os.getenv("RIVERGUARD_DENSE_THRESHOLD", cls.dense_threshold)),

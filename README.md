@@ -39,7 +39,7 @@ flowchart LR
 1. Each frame is run through the detector (confidence ≥ 0.35 by default). Large photos are also scanned as
    overlapping 640 px tiles, so small, distant items keep enough pixels to be recognised. A box cut off by a
    tile's edge is dropped, because the full frame or the neighbouring tile sees that item whole, and duplicate
-   boxes where tiles overlap are merged.
+   boxes where tiles overlap are merged. Boxes that cover a face are dropped too (see Limitations).
 2. The whole frame also goes through a small classifier that answers one question: *is the water carpeted with
    trash?* That catches scenes where items are packed too tightly for the detector to count.
 3. Detections are counted per class and drawn on the frame with a SAFE / DANGER status banner.
@@ -159,6 +159,11 @@ and never message a real chat.
   of a few items. It was trained on only ~100 dense photos; more varied dense examples are the main lever (a third
   round with more "not dense" photos made it more cautious rather than better, see
   [training/README.md](training/README.md)). Murky water and night-time footage are untested.
+- **The item detector has only ever seen rivers.** It never saw a person, so it boxed faces as trash (12 of 16 test
+  selfies), and its four classes are all plastic, so a drink can comes out as `plastic_bottle`. For now a small face
+  detector ([YuNet](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet), MIT licence) drops
+  boxes that cover a face; on the river test sets it changed no SAFE/DANGER call. The real fix is a retrain with
+  photos of people as negative examples and an `other_trash` class for cans and glass.
 - The original proposal also described a three-level scale (safe / warning / danger) and GPS-tagged alerts; neither
   is implemented yet.
 - Counting is per frame, so the same bottle is re-counted as it drifts past. Tracking (e.g. ByteTrack) would allow
@@ -171,6 +176,6 @@ RiverGuard started as a 3-person group project for the Artificial Intelligence c
 
 ## License
 
-[AGPL-3.0](LICENSE), inherited from [Ultralytics YOLO](https://github.com/ultralytics/ultralytics). Images are
-licensed separately: see [examples/ATTRIBUTION.md](examples/ATTRIBUTION.md) and the training credits in
+[AGPL-3.0](LICENSE), inherited from [Ultralytics YOLO](https://github.com/ultralytics/ultralytics). The YuNet face
+model is MIT-licensed ([its licence](models/face_detection_yunet_2023mar.LICENSE)). Images are licensed separately: see [examples/ATTRIBUTION.md](examples/ATTRIBUTION.md) and the training credits in
 [training/ATTRIBUTION.md](training/ATTRIBUTION.md) and [training/DENSITY_ATTRIBUTION.md](training/DENSITY_ATTRIBUTION.md).

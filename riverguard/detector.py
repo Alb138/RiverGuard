@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 
-from .backends import load_classifier, load_detector
+from .backends import FaceDetector, load_classifier, load_detector
 
 MAX_SIDE = 1280  # the app downscales larger inputs to this before detection
 
@@ -125,16 +125,31 @@ def merge_boxes(boxes: np.ndarray, scores: np.ndarray, ios_thresh: float = 0.6) 
     return keep
 
 
+def covers_face(box: tuple[int, int, int, int], faces: np.ndarray, min_share: float = 0.5) -> bool:
+    """True if at least `min_share` of some face lies inside the box.
+
+    The detector was trained on river photos only and has never seen a person, so it often boxes a face
+    (in a webcam, nearly always) as other_plastic or plastic_bottle. Items held next to a face don't cover it."""
+    if not len(faces):
+        return False
+    x1, y1, x2, y2 = box
+    iw = np.clip(np.minimum(x2, faces[:, 2]) - np.maximum(x1, faces[:, 0]), 0, None)
+    ih = np.clip(np.minimum(y2, faces[:, 3]) - np.maximum(y1, faces[:, 1]), 0, None)
+    areas = np.maximum((faces[:, 2] - faces[:, 0]) * (faces[:, 3] - faces[:, 1]), 1e-9)
+    return bool(np.any(iw * ih / areas >= min_share))
+
+
 DENSE_CLASS = "dense"  # the density classifier's positive class (its other class is "not_dense")
 
 
 class TrashDetector:
-    """Item detector plus optional density classifier. Each model is a .pt checkpoint (runs on Ultralytics/PyTorch)
-    or an .onnx export (runs on onnxruntime alone, see riverguard/backends.py)."""
+    """Item detector plus optional density classifier and face filter. Each model is a .pt checkpoint (runs on
+    Ultralytics/PyTorch) or an .onnx export (runs on onnxruntime alone, see riverguard/backends.py)."""
 
     def __init__(self, model_path: str, conf: float = 0.35, density_model_path: str | None = None,
-                 dense_threshold: float = 0.5):
+                 dense_threshold: float = 0.5, face_model_path: str | None = None):
         self.model = load_detector(model_path)
+        self.faces = FaceDetector(face_model_path) if face_model_path else None
         self.conf = conf
         self.density = load_classifier(density_model_path) if density_model_path else None
         self.dense_index = next((i for i, n in self.density.names.items() if n == DENSE_CLASS), None) \
@@ -157,7 +172,8 @@ class TrashDetector:
 
         With `tiled=True`, frames much larger than the model's 640 px input are also scanned as
         overlapping 640 px tiles, so small, distant items keep enough pixels to be recognised.
-        Tile boxes cut off by an inner tile edge are dropped, and duplicates are merged.
+        Tile boxes cut off by an inner tile edge are dropped, and duplicates are merged. With a face model,
+        boxes covering a face are dropped too.
         """
         conf = self.conf if conf is None else conf
         h, w = frame_bgr.shape[:2]
@@ -185,6 +201,9 @@ class TrashDetector:
                 keep += [int(group[i]) for i in merge_boxes(boxes[group], scores[group])] if len(group) else []
         else:
             keep = range(len(boxes))
+        if self.faces is not None:
+            faces = self.faces(frame_bgr)
+            keep = [i for i in keep if not covers_face(boxes[i], faces)]
 
         detections = [
             Detection(label=self.model.names[int(classes[i])], confidence=float(scores[i]),

@@ -25,7 +25,8 @@ VIDEO_FPS = 5  # frames analysed per second of video
 
 settings = Settings.from_env()
 detector = TrashDetector(settings.model_path, conf=settings.conf_threshold,
-                         density_model_path=settings.density_model_path, dense_threshold=settings.dense_threshold)
+                         density_model_path=settings.density_model_path, dense_threshold=settings.dense_threshold,
+                         face_model_path=settings.face_model_path)
 # One model run at a time across all visitors: parallel runs on a small server only add memory, not speed.
 model_lock = threading.Lock()
 alerter = TelegramAlerter(settings.telegram_token, settings.telegram_chat_id, settings.alert_cooldown)
@@ -135,7 +136,8 @@ with gr.Blocks(title="RiverGuard") as demo:
                       concurrency_limit=1, api_name="detect_video")
 
     with gr.Tab("Webcam"):
-        gr.Markdown("Point your camera at some plastic bottles or bags (a photo on another screen works too).")
+        gr.Markdown("Point your camera at some plastic bottles or bags (a photo on another screen works too). "
+                    "Faces are ignored: the model only learned rivers, so it used to mistake them for trash.")
         with gr.Row():
             cam_in = gr.Image(sources=["webcam"], streaming=True, type="numpy", label="Webcam")
             with gr.Column():

@@ -28,6 +28,9 @@ training/kaggle.sh kernels list --mine          # Kaggle CLI (needs Python 3.11+
 - `models/best.pt` is v1 (item detector); `models/density.pt` is the v3b dense-trash classifier (threshold 0.5).
   Replace either only when a new model beats it on the test sets in `training/README.md`, and when replacing
   `density.pt`, copy that build's `datasets/density-*/ATTRIBUTION.md` to `training/DENSITY_ATTRIBUTION.md`.
+- `models/face_detection_yunet_2023mar.onnx` (YuNet, MIT, licence file next to it) drops trash boxes that cover a
+  face: the detector never saw people and boxed faces as trash. It's a stopgap until a retrain adds people photos as
+  negatives (and an `other_trash` class for cans/glass); re-check whether it's still needed after that.
 - The live demo runs `models/*.onnx`, not the `.pt` files. Re-export after replacing a `.pt` (commands in the README's
   Deployment section); `test_onnx_exports_match_pytorch_models` fails until you do.
 - Keep demo examples (`examples/`) free of trash-carpeted scenes, and check each one doesn't trigger a false alarm.

@@ -24,6 +24,24 @@ def load_classifier(path: str):
     return OnnxClassifier(path) if str(path).endswith(".onnx") else UltralyticsClassifier(path)
 
 
+class FaceDetector:
+    """OpenCV's YuNet face detector (models/face_detection_yunet_2023mar.onnx, MIT licence, from opencv_zoo)."""
+
+    # At 0.8 it still caught every face the trash model boxed in 16 test selfies, while on 174 river test photos
+    # the only trash boxes it removed were two false alarms (a house and a kayaker).
+    def __init__(self, path: str, score: float = 0.8):
+        self.net = cv2.FaceDetectorYN.create(str(path), "", (320, 320), score, 0.3, 50)
+
+    def __call__(self, image_bgr: np.ndarray) -> np.ndarray:
+        """Face boxes as (n, 4) x1, y1, x2, y2 pixels."""
+        h, w = image_bgr.shape[:2]
+        self.net.setInputSize((w, h))
+        _, faces = self.net.detect(image_bgr)
+        if faces is None:
+            return np.zeros((0, 4), np.float32)
+        return np.column_stack([faces[:, 0], faces[:, 1], faces[:, 0] + faces[:, 2], faces[:, 1] + faces[:, 3]])
+
+
 # ---------- Ultralytics (.pt) ----------
 
 class UltralyticsDetector:

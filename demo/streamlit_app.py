@@ -66,7 +66,8 @@ st.set_page_config(page_title="RiverGuard", page_icon="🌊", layout="wide")
 def load_models(version: str) -> tuple[TrashDetector, threading.Lock]:
     detector = TrashDetector(str(ROOT / "models" / "best.onnx"), conf=DEFAULTS.conf_threshold,
                              density_model_path=str(ROOT / "models" / "density.onnx"),
-                             dense_threshold=DEFAULTS.dense_threshold)
+                             dense_threshold=DEFAULTS.dense_threshold,
+                             face_model_path=str(ROOT / "models" / "face_detection_yunet_2023mar.onnx"))
     return detector, threading.Lock()  # one model run at a time: parallel runs only add memory on a small server
 
 
@@ -182,7 +183,8 @@ with video_tab:
 
 with camera_tab:
     if camera_tab.open:
-        st.markdown("Take a photo of some plastic bottles or bags (a photo on another screen works too).")
+        st.markdown("Take a photo of some plastic bottles or bags (a photo on another screen works too). "
+                    "Faces are ignored: the model only learned rivers, so it used to mistake them for trash.")
         if st.toggle("Turn on the camera"):
             left, right = st.columns(2)
             with left:
