@@ -1,0 +1,80 @@
+# v4b item detector: v4's recipe, with less lake footage and look-alike negatives.
+#   python training/build_dataset.py --sources training/sources-v4b.yaml --out datasets/riverguard-v4b
+#
+# v4 fixed people and cans but learned to call small white shapes plastic (coins on a lily pad, a cloud):
+# about 40% of its images were low-resolution lake footage where distant bottles are white specks.
+#
+# Why: v1 boxed faces as trash (it had never seen a person) and called a drink can plastic_bottle (all four of its
+# classes are plastic). The public datasets below already label cans and metal; v1/v2 dropped those boxes.
+# Cartons, paper and wood stay dropped: v1's own data calls juice cartons plastic_package, and paper/wood are
+# mostly tiny, ambiguous specks. See training/README.md "v4".
+
+classes: [other_plastic, plastic_bag, plastic_bottle, plastic_package, other_trash]
+
+sources:
+  - name: base                # v1's training data
+    roboflow: plastic-waste/float-plastic-waste-river-yfg5q/3
+    license: CC BY 4.0
+    use: train
+    hold_out: [test]          # the in-domain test set
+    map: {other_plastic: other_plastic, plastic_bag: plastic_bag, plastic_bottle: plastic_bottle,
+          plastic_package: plastic_package}
+
+  - name: waste-in-water      # harbour and sea-surface scenes; its "Metal" boxes are clear photos of drink cans
+    roboflow: chinatele/waste-in-water/1
+    license: CC BY 4.0
+    use: train
+    hold_out: [test]          # held-out cans (and plastic) for the other_trash check
+    map:
+      bottles: plastic_bottle
+      Plastic bottle: plastic_bottle
+      Plastic Bottle: plastic_bottle
+      Plastic-Bottle: plastic_bottle
+      Plastic bag: plastic_bag
+      Plastic Bag: plastic_bag
+      Plastic packaging: plastic_package
+      Plastic cup: plastic_package
+      Plastic: other_plastic
+      plastic: other_plastic
+      Plastic Waste: other_plastic
+      Can: other_trash
+      Metal: other_trash
+      Metal Waste: other_trash
+      Bottle cap: null
+      Juice box: null
+      Juice Box: null
+      Wood: null
+      Undefined trash: null
+
+  - name: floating-waste      # low-angle lake footage with small, distant floating items, including cans
+    roboflow: aol-ai-cer7r/floating-waste-r6ifo-hcjzg/1
+    license: CC BY 4.0
+    use: train
+    hold_out: [test]
+    max_groups: 600           # v4 used 1500 (~40% of all images); its white specks taught 'white shape = plastic'
+    map: {bottle: plastic_bottle, plastic: other_plastic, can: other_trash, carton: null, paper: null}
+
+  - name: river-waste         # top-down drone footage of a river
+    roboflow: class-czqdb/river-waste/2
+    license: MIT
+    use: train
+    map: {Plastic: other_plastic}
+
+  - name: people              # photos of people with nothing to detect (training/collect_negatives.py)
+    local: datasets/negatives
+    license: CC BY / CC BY-SA / CC0 / public domain (Wikimedia Commons, see training/NEGATIVES_ATTRIBUTION.md)
+    use: train
+    hold_out: [test]          # held-out photographers: how often does the model box a person?
+
+  - name: lookalikes          # white shapes on water that aren't trash: clouds, birds, sails, ice, lilies, coins
+    local: datasets/negatives-lookalikes
+    license: CC BY / CC BY-SA / CC0 / public domain (Wikimedia Commons, see training/NEGATIVES_ATTRIBUTION.md)
+    use: train
+    hold_out: [test]
+
+  - name: riverguard-test     # tier A: 17 real water scenes, never trained on
+    roboflow: plastic-waste/riverguard-test/1
+    license: CC BY / CC BY-SA / CC0 / public domain (Wikimedia Commons, see training/ATTRIBUTION.md)
+    use: test
+    map: {other_plastic: other_plastic, plastic_bag: plastic_bag, plastic_bottle: plastic_bottle,
+          plastic_package: plastic_package, trash_patch: null}

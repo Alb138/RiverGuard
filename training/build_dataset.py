@@ -4,7 +4,8 @@
     python training/build_dataset.py --no-zip
 
 What it does, per source: download the Roboflow version, remap its classes to RiverGuard's
-four (dropping unmapped ones), and convert any polygon labels to boxes. Then across sources:
+(dropping unmapped ones), and convert any polygon labels to boxes. A `local:` source is a folder of
+photos with nothing to detect (negatives, e.g. people), split into subfolders. Then across sources:
 - `use: test` sources, and the `hold_out` splits of train sources (e.g. a dataset's own test split),
   become the test set, one subfolder per source so each can be scored on its own
   (`data-test-<source>.yaml`). Training images that are near-duplicates of a test image are dropped,
@@ -81,7 +82,18 @@ def hamming_to_set(h: int, others: np.ndarray) -> int:
     return int(np.unpackbits(x.view(np.uint8)).reshape(-1, 64).sum(axis=1).min())
 
 
+def collect_negatives(source: dict) -> list[dict]:
+    """A local folder of photos with nothing to detect (e.g. people): <local>/{train,valid,test}/*.jpg, no labels.
+    Only those split folders are read, so working folders next to them (thumbnails, contact sheets) are ignored."""
+    folder = ROOT / source["local"]
+    return [{"img": img, "lines": [], "source": source["name"], "split": split, "group": f"{source['name']}/{img.stem}"}
+            for split in ("train", "valid", "test")
+            for img in sorted(p for p in (folder / split).glob("*") if p.suffix.lower() in IMG_EXTS)]
+
+
 def collect(source: dict, classes: list[str], raw_dir: Path) -> list[dict]:
+    if "local" in source:
+        return collect_negatives(source)
     ws, proj, ver = source["roboflow"].split("/")
     src_dir = rf.download_version(ws, proj, int(ver), raw_dir / source["name"])
     names = read_names(src_dir)
@@ -113,7 +125,7 @@ def main() -> None:
     classes = cfg["classes"]
     pools = {"train": [], "test": []}
     for source in cfg["sources"]:
-        print(f"== {source['name']} ({source['roboflow']}, {source.get('license', 'license?')})")
+        print(f"== {source['name']} ({source.get('roboflow') or source['local']}, {source.get('license', 'license?')})")
         items = collect(source, classes, args.raw)
         if source["use"] == "test":
             held, items = items, []

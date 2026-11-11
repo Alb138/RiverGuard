@@ -26,7 +26,7 @@ OUT = ROOT / "datasets" / "density"
 CANDIDATES = OUT / "candidates.jsonl"
 STATE = OUT / "openverse_state.json"
 THUMBS = OUT / "thumbs"
-UA = {"User-Agent": "RiverGuard-portfolio/0.3 (non-commercial student project; dataset collection)"}
+UA = {"User-Agent": "RiverGuard-portfolio/0.4 (student project; dataset collection; https://github.com/Alb138/RiverGuard)"}
 
 # Dense/trash terms first, then look-alike rivers from the same regions (negatives that share
 # skylines, boats and water colour, so "Asian city" can't become a shortcut for "dense").
@@ -123,6 +123,10 @@ def commons() -> None:
 
 
 COMMONS_QUERIES = [
+    # v4 (searched first): piles on banks, at floodgates and against bridges, which v3b called "not dense"
+    "garbage pile river", "trash pile riverbank", "rubbish riverbank", "plastic waste riverbank", "garbage floodgate",
+    "sampah pintu air", "sampah menumpuk sungai", "trash trap river", "litter trap river", "debris boom river",
+    "garbage bridge river", "flood debris plastic", "plastic bottles river bank", "trash accumulation river",
     "river garbage", "river pollution plastic", "polluted river", "floating garbage", "garbage canal", "trash boom",
     "river trash", "plastic waste river", "sampah sungai", "sampah kali", "garbage river Indonesia",
     "garbage river Philippines", "garbage river India", "clogged canal garbage", "trash rack river",
@@ -288,7 +292,24 @@ def _priority(query: str) -> int:
     return next((i for i, t in enumerate(PRIORITY_TERMS) if t in q), len(PRIORITY_TERMS))
 
 
-def thumbs(max_seconds: float, max_priority: int | None = None) -> None:
+# File titles naming trash, strongest first. Deep pages of broad searches are mostly off-topic (bins, bands),
+# so --title-match fetches only titles that name trash (2,957 of 7,376 missing in v4).
+TITLE_TERMS = [r"garbage|rubbish|trash|litter|sampah|basura|m[üu]ll|d[ée]chet", r"plastic", r"pollut|waste|debris|dump"]
+
+
+# Titles that match TITLE_TERMS but are never litter in water: a synth meetup series, street bins, dumpsters.
+TITLE_OFF_TOPIC = re.compile(r"trash audio|synth|trash ?(can|bin|bag|truck)s?\b|garbage ?(can|bin|truck)s?\b|"
+                             r"rubbish ?(bin|truck)s?\b|waste ?(bin|basket|paper basket)s?\b|dumpster|litter ?bin|"
+                             r"\bcensus\b|enumeration district|\bmap\b|diagram|poster|logo", re.I)
+
+
+def _title_rank(title: str) -> int | None:
+    if TITLE_OFF_TOPIC.search(title):
+        return None
+    return next((k for k, t in enumerate(TITLE_TERMS) if re.search(t, title, re.I)), None)
+
+
+def thumbs(max_seconds: float, max_priority: int | None = None, title_match: bool = False) -> None:
     """Flickr and other CDNs in parallel; Wikimedia one at a time (it rate-limits hard), skipped once limited."""
     from concurrent.futures import ThreadPoolExecutor
     THUMBS.mkdir(parents=True, exist_ok=True)
@@ -297,8 +318,9 @@ def thumbs(max_seconds: float, max_priority: int | None = None) -> None:
     slow = sorted((j for j in todo if j[1]["source"] == "wikimedia"
                    # photos only: TIFF archive scans and SVG charts have no usable thumbnails
                    and j[1]["url"].split("?")[0].lower().endswith((".jpg", ".jpeg", ".png", ".webp"))
-                   and (max_priority is None or _priority(j[1]["query"]) < max_priority)),
-                  key=lambda j: _priority(j[1]["query"]))
+                   and (max_priority is None or _priority(j[1]["query"]) < max_priority)
+                   and (not title_match or _title_rank(j[1].get("title", "")) is not None)),
+                  key=lambda j: (_title_rank(j[1].get("title", "")) if title_match else 0, _priority(j[1]["query"])))
     t0, res = time.time(), Counter()
     with ThreadPoolExecutor(6) as pool:
         for k, outcome in enumerate(pool.map(_fetch_thumb, fast), 1):
@@ -327,13 +349,15 @@ def main() -> None:
     ap.add_argument("--limit", type=int, default=800, help="closeups: how many photos to add")
     ap.add_argument("--max-priority", type=int, help="thumbs: only Wikimedia searches ranked below this in "
                     "PRIORITY_TERMS (e.g. 12 = everything before 'polluted river')")
+    ap.add_argument("--title-match", action="store_true", help="thumbs: only Wikimedia files whose title names "
+                    "trash (TITLE_TERMS), strongest words first")
     ap.add_argument("--max-requests", type=int, default=190, help="Openverse requests this run (anon: 200/day)")
     ap.add_argument("--max-seconds", type=float, default=3000, help="time budget for downloads / searches")
     args = ap.parse_args()
     {"openverse": lambda: openverse(args.max_requests), "commons": commons,
      "commons-search": lambda: commons_search(args.max_seconds), "datasets": local_datasets,
      "closeups": lambda: closeups(args.limit),
-     "thumbs": lambda: thumbs(args.max_seconds, args.max_priority)}[args.step]()
+     "thumbs": lambda: thumbs(args.max_seconds, args.max_priority, args.title_match)}[args.step]()
 
 
 if __name__ == "__main__":

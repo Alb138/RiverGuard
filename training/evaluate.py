@@ -8,6 +8,9 @@ Tier B: images with one tag each (safe / danger / none), e.g. dense scenes too c
 
 Add --tiled to also score each model with tiled inference. Alarm metrics see images the way the app
 does (downscaled to 1280 px, same confidence), so they predict what users will experience.
+
+Negatives (photos with nothing to detect, e.g. the held-out people photos): `images_with_boxes` is the share of
+photos that got any box at all, so every one of them is a false detection. --face-model adds the face filter.
 """
 
 import argparse
@@ -68,6 +71,7 @@ def alarm_metrics(detector: TrashDetector, images: list[Path], gt_danger: np.nda
         "false_alerts": fp,
         "alert_recall": tp / (tp + fn) if tp + fn else float("nan"),
         "alert_precision": tp / (tp + fp) if tp + fp else float("nan"),
+        "images_with_boxes": float(np.mean(pred > 0)),
     }
     if gt_count is not None:
         out["count_mae"] = float(np.mean(np.abs(pred - gt_count)))
@@ -93,6 +97,7 @@ def main() -> None:
     ap.add_argument("--tiled", action="store_true", help="also score each model with tiled inference")
     ap.add_argument("--density", help="also score each model with this whole-photo density classifier")
     ap.add_argument("--dense-threshold", type=float, default=0.5)
+    ap.add_argument("--face-model", help="drop boxes covering a face (models/face_detection_yunet_2023mar.onnx)")
     ap.add_argument("--out", default="runs/eval/results.json")
     args = ap.parse_args()
 
@@ -108,11 +113,11 @@ def main() -> None:
 
     results = {}
     for weights in args.models:
-        detector = TrashDetector(weights)
-        dense_detector = TrashDetector(weights, density_model_path=args.density,
-                                       dense_threshold=args.dense_threshold) if args.density else None
+        detector = TrashDetector(weights, face_model_path=args.face_model)
+        dense_detector = TrashDetector(weights, density_model_path=args.density, dense_threshold=args.dense_threshold,
+                                       face_model_path=args.face_model) if args.density else None
         row = {}
-        if args.data:
+        if args.data and gt_count.sum():  # mAP needs boxes; a negatives-only set has none
             names = list(data["names"].values())
             if detector.class_names != names[: len(detector.class_names)]:
                 # v1 (4 classes) may be scored on a v2 test set (4 classes + trash_patch): its classes must be a prefix.
@@ -134,7 +139,7 @@ def main() -> None:
                                               args.threshold, tiled=tiled)
 
     cols = ["mAP50", "mAP50-95", "count_mae", "count_bias", "decision_accuracy", "missed_alerts", "false_alerts",
-            "dense_only_missed", "dense_only_false"]
+            "images_with_boxes", "dense_only_missed", "dense_only_false"]
     cols = [c for c in cols if any(c in r for r in results.values())]
     print("| model | " + " | ".join(cols) + " |")
     print("|---" * (len(cols) + 1) + "|")
