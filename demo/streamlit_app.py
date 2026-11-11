@@ -84,7 +84,7 @@ def decode(data: bytes) -> np.ndarray:
     return fit_within(cv2.cvtColor(np.asarray(img), cv2.COLOR_RGB2BGR))
 
 
-@st.cache_data(max_entries=64, show_spinner="Looking for plastic…")
+@st.cache_data(max_entries=64, show_spinner="Looking for trash…")
 def analyze(data: bytes, conf: float, threshold: int, tiled: bool, version: str) -> tuple[np.ndarray, DetectionResult]:
     """Annotated BGR frame and result. Cached across visitors, so the examples are instant after the first run.
     `version` keeps results from older code out of the cache."""

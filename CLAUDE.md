@@ -25,12 +25,13 @@ training/kaggle.sh kernels list --mine          # Kaggle CLI (needs Python 3.11+
 - The public demo must never send Telegram alerts: visitors only see an alert *preview*. `demo/streamlit_app.py` has
   no alerter at all; keep it that way and never add Telegram secrets to Streamlit Cloud.
 - Credit teammates as "a 3-person group project", without names.
-- `models/best.pt` is v1 (item detector); `models/density.pt` is the v3b dense-trash classifier (threshold 0.5).
-  Replace either only when a new model beats it on the test sets in `training/README.md`, and when replacing
-  `density.pt`, copy that build's `datasets/density-*/ATTRIBUTION.md` to `training/DENSITY_ATTRIBUTION.md`.
+- `models/best.pt` is v4 (item detector, 5 classes incl. `other_trash`, fine-tuned from v1 with people photos as
+  negatives, `training/sources-v4.yaml`); `models/density.pt` is the v3b dense-trash classifier (threshold 0.5).
+  Replace either only when a new model beats it on the test sets in `training/README.md` (the user accepted v4 with
+  one extra tier-A false alarm), and copy that build's credits: `datasets/density-*/ATTRIBUTION.md` to
+  `training/DENSITY_ATTRIBUTION.md`, `datasets/negatives*/ATTRIBUTION.md` to `training/NEGATIVES_ATTRIBUTION.md`.
 - `models/face_detection_yunet_2023mar.onnx` (YuNet, MIT, licence file next to it) drops trash boxes that cover a
-  face: the detector never saw people and boxed faces as trash. It's a stopgap until a retrain adds people photos as
-  negatives (and an `other_trash` class for cans/glass); re-check whether it's still needed after that.
+  face. v1 boxed faces as trash; v4 rarely does, but the user chose to keep the filter as a safety net.
 - The live demo runs `models/*.onnx`, not the `.pt` files. Re-export after replacing a `.pt` (commands in the README's
   Deployment section); `test_onnx_exports_match_pytorch_models` fails until you do.
 - Keep demo examples (`examples/`) free of trash-carpeted scenes, and check each one doesn't trigger a false alarm.

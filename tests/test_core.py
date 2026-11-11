@@ -96,7 +96,7 @@ def test_model_loads_with_expected_classes():
     from riverguard import TrashDetector
 
     detector = TrashDetector(str(DEFAULT_MODEL_PATH))
-    assert detector.class_names == ["other_plastic", "plastic_bag", "plastic_bottle", "plastic_package"]
+    assert detector.class_names == ["other_plastic", "plastic_bag", "plastic_bottle", "plastic_package", "other_trash"]
     result = detector.detect(np.zeros((640, 640, 3), np.uint8), threshold=5)
     assert result.count == 0 and not result.over_threshold
 
@@ -155,19 +155,20 @@ def test_face_filter_drops_boxes_on_faces():
                              face_model_path=str(MODELS / "face_detection_yunet_2023mar.onnx"))
     assert len(detector.faces(np.zeros((480, 640, 3), np.uint8))) == 0  # the real face model loads and runs
     frame = fit_within(cv2.imread(str(Path(__file__).parent.parent / "examples" / "danube-bottle.jpg")))
-    assert detector.detect(frame, 5).count == 1  # the river photo has no face, so nothing is filtered
-    (bottle,) = detector.detect(frame, 5).detections
+    before = detector.detect(frame, 5)  # the river photo has no face, so nothing is filtered
+    (bottle,) = [d for d in before.detections if d.label == "plastic_bottle"]
     x1, y1, x2, y2 = bottle.box
     detector.faces = lambda image: np.array([[x1 + 10, y1 + 10, x1 + 60, y1 + 60]], dtype=float)  # a "face" on it
-    assert detector.detect(frame, 5).count == 0
+    after = detector.detect(frame, 5)
+    assert after.count == before.count - 1 and "plastic_bottle" not in after.per_class
 
 
 @pytest.mark.skipif(not Path(DEFAULT_MODEL_PATH).exists(), reason="model weights not present")
-@pytest.mark.parametrize("example, expected", [
-    ("danube-bottle.jpg", 1),  # one long bottle: tiles once split it into two "bottles"
-    ("versailles-pond.jpg", 3),  # a tile once saw a "bottle" in the palace behind the pond
+@pytest.mark.parametrize("example, label, expected", [
+    ("danube-bottle.jpg", "plastic_bottle", 1),  # one long bottle: tiles once split it into two "bottles"
+    ("versailles-pond.jpg", None, 3),  # a tile once saw a "bottle" in the palace behind the pond
 ])
-def test_tiling_does_not_add_fragments_or_edge_artifacts(example, expected):
+def test_tiling_does_not_add_fragments_or_edge_artifacts(example, label, expected):
     import cv2
 
     from riverguard import TrashDetector
@@ -175,7 +176,8 @@ def test_tiling_does_not_add_fragments_or_edge_artifacts(example, expected):
 
     detector = TrashDetector(str(DEFAULT_MODEL_PATH))
     frame = fit_within(cv2.imread(str(Path(__file__).parent.parent / "examples" / example)))
-    assert detector.detect(frame, 5, tiled=True).count == expected
+    result = detector.detect(frame, 5, tiled=True)
+    assert (result.per_class.get(label, 0) if label else result.count) == expected
 
 
 def test_dense_patch_triggers_danger_and_is_not_counted_as_an_item():

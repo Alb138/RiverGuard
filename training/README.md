@@ -104,6 +104,46 @@ unseen photographers. v3b ships because a missed blockage is the costly error fo
 shortfall against the ship criteria is in-domain accuracy, 2.5 points below v1 instead of ≤ 1. The next step is
 more *dense* examples from varied rivers; more negatives alone won't help.
 
+### v4: people, cans and look-alikes (item detector)
+
+Once the demo was public, two failures showed up that the test sets above never measured: the webcam boxed
+visitors' faces as `other_plastic`, and a drink can came out as `plastic_bottle`. v1 had never seen a person, and
+all four of its classes are plastic.
+
+- **`other_trash` class.** Two of the public datasets already box cans and metal (about 2,300 boxes); v1 and v2
+  dropped them. v4 maps them to a 5th class ([sources-v4.yaml](sources-v4.yaml)). A SAM 3 audit of v1's own data
+  found only a handful of cans labelled as plastic, not worth relabelling.
+- **Photos of people with nothing to box.** [collect_negatives.py](collect_negatives.py) found 977 openly licensed
+  Commons photos (selfies, portraits, crowds, kayakers, ferry passengers). Screening removed 297: paintings, and
+  anything showing cups, bottles or bags, which would teach the model to ignore real trash. 511 train, 118 are a
+  held-out test, split by photographer ([credits](NEGATIVES_ATTRIBUTION.md)).
+- **Fine-tuned from v1** (`init.pt` in the Kaggle dataset), 73 epochs.
+
+v4 then called small white shapes plastic (coins on a lily pad, a cloud), so **v4b** tried a fix: a 330-photo
+look-alike set (clouds, swans, gulls, egrets, sails, ice, lily pads, foam) and less of the lake footage whose
+distant bottles are white specks ([sources-v4b.yaml](sources-v4b.yaml)).
+
+| Alarm = items > 5 **or** dense (tiled) | v1 | **v4** (shipped) | v4b |
+|---|---|---|---|
+| In-domain (273) | 93.8% · 5 missed · 12 false | **94.5% · 5 · 10** | 93.4% · 6 · 12 |
+| Tier A (17) | **88.2% · 1 · 1** | 82.4% · 1 · 2 | 82.4% · 1 · 2 |
+| Tier B (66) | 78.8% · 14 · 0 | **80.3% · 13 · 0** | 78.8% · 14 · 0 |
+| Tier C (108) | 97.2% · 1 · 2 | 97.2% · 1 · 2 | 97.2% · 1 · 2 |
+| Held-out cans called `other_trash` (84) | 0% (87% missed) | **83%** | 71% |
+| Held-out people photos with any box (118) | 65% | **5%** | 5% |
+| Held-out look-alikes with any box (46) | 33% | 17% | **13%** |
+| Test selfies with a box (16) | 12 | **1** | — |
+
+v4 ships: it fixes both reported failures and is equal or better everywhere except tier A, where the coins on a
+lily pad became 6 "plastic bags" (one extra false alarm). v4b fixed the cloud and halved look-alike boxes, but lost
+cans and in-domain accuracy, and still alarmed on the coins. The face filter stays as a safety net; on top of v4 it
+removed nothing on the test sets.
+
+Collecting more *dense* photos for the classifier (piles of trash on river banks, which v3b misses) was tried in the
+same round: about 600 title-matched Commons photos, ranked by v3b, yielded 6 new dense scenes. Commons search results
+for "river trash" are mostly bins, landfills, cleanup events and a synth-music meetup. A stock-photo source (e.g. the
+Pexels API) would be the next step.
+
 ## Setup
 
 Keys go in `.env` (see `.env.example`): `ROBOFLOW_API_KEY` and `KAGGLE_API_TOKEN`.

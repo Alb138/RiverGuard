@@ -15,16 +15,16 @@ from .draw import annotate
 
 INTRO = """
 # 🌊 RiverGuard: plastic waste detection with early-warning alerts
-A YOLO11s model fine-tuned to spot **plastic bottles, bags, packaging and other plastic** in rivers, plus a
-second model that checks whether the water is **carpeted with trash** too dense to count.
+A YOLO11s model fine-tuned to spot **plastic bottles, bags, packaging and other plastic**, plus **cans and other
+trash**, in rivers, and a second model that checks whether the water is **carpeted with trash** too dense to count.
 When more items than the safe limit are visible, or the water is carpeted, RiverGuard sends a
 **Telegram alert with a photo** to cleanup crews. This public demo shows a *preview* of that alert instead of sending it.
 """
 
 FOOTER = (
-    "Models: YOLO11s item detector fine-tuned on a public Roboflow river-trash dataset "
-    "(P 0.85 · R 0.72 · mAP50 0.83), and a YOLO11s-cls dense-trash classifier "
-    "(79% correct alarms on trash-carpeted test rivers). "
+    "Models: YOLO11s item detector fine-tuned on public river-trash datasets plus photos of people it must ignore "
+    "(mAP50 0.81 on the held-out test split), and a YOLO11s-cls dense-trash classifier "
+    "(80% correct alarms on trash-carpeted test rivers). "
     "[Source code on GitHub](https://github.com/Alb138/RiverGuard) · Originally a university group project."
 )
 
@@ -51,7 +51,7 @@ def status_html(result: DetectionResult, rule: str = "", prefix: str = "") -> st
         rows = f"<li><b>Dense trash</b> × {len(result.patches)} (too packed to count)</li>" + rows
     if result.is_dense:
         rows = f"<li><b>Dense trash</b> covering the water ({result.dense_score:.0%} confidence)</li>" + rows
-    rows = rows or "<li>No plastic waste detected</li>"
+    rows = rows or "<li>No waste detected</li>"
     dense = result.is_dense or result.patches
     headline = f"dense trash + {items(result.count)}" if dense else f"{prefix}{items(result.count)}"
     return f"""
