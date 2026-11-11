@@ -2,8 +2,8 @@
 
 **Real-time plastic waste detection for rivers, with Telegram early-warning alerts.**
 
-RiverGuard watches a camera feed of a river or floodgate. A fine-tuned YOLO11 detector counts floating plastic and
-other trash, and a second model checks whether the water is carpeted with trash too dense to count. When either says the river is over
+RiverGuard watches a camera feed of a river or floodgate. A fine-tuned YOLO11 detector counts floating plastic, and a
+second model checks whether the water is carpeted with trash too dense to count. When either says the river is over
 the limit, it sends a Telegram alert with an evidence photo so cleanup crews can act *before* the build-up blocks a
 floodgate.
 
@@ -26,7 +26,7 @@ the crew when the waste count passes a safe limit.
 
 ```mermaid
 flowchart LR
-    A[Camera / video / image] --> B[YOLO11s detector<br/>4 plastic classes + other trash]
+    A[Camera / video / image] --> B[YOLO11s detector<br/>4 plastic classes]
     A --> H[YOLO11s-cls<br/>dense-trash check]
     B --> C{count &gt; threshold<br/>or dense?}
     H --> C
@@ -51,11 +51,11 @@ flowchart LR
 
 | | Item detector ([`models/best.pt`](models/best.pt), 19 MB) | Dense-trash check ([`models/density.pt`](models/density.pt), 11 MB) |
 |---|---|---|
-| Base model | YOLO11s (COCO-pretrained), fine-tuned twice (v1, then v4) | YOLO11s-cls (ImageNet-pretrained) |
-| Output | Boxes: `other_plastic`, `plastic_bag`, `plastic_bottle`, `plastic_package`, `other_trash` (cans, metal) | P(water carpeted with trash) |
-| Data | Four public river/harbour/lake trash datasets from Roboflow Universe (~9,400 images) plus 511 openly licensed photos of people with nothing to box | ~1,100 openly licensed photos from 160+ photographers (Openverse, Wikimedia Commons, Roboflow Universe), tagged dense / not dense |
-| Training | v1: 64 epochs on Colab; v4: 73 more epochs from v1, 640 px, Kaggle T4 | 384 px, Kaggle T4, split by photographer |
-| Test | mAP50 0.81 on the original held-out test split · 83% of held-out cans labelled `other_trash` · boxes on 5% of held-out people photos (v1: 65%) | Threshold 0.5 chosen on held-out photographers |
+| Base model | YOLO11s (COCO-pretrained) | YOLO11s-cls (ImageNet-pretrained) |
+| Output | Boxes: `other_plastic`, `plastic_bag`, `plastic_bottle`, `plastic_package` | P(water carpeted with trash) |
+| Data | Public river-trash dataset from Roboflow | ~1,100 openly licensed photos from 160+ photographers (Openverse, Wikimedia Commons, Roboflow Universe), tagged dense / not dense |
+| Training | 64 epochs, 640 px, Google Colab T4 | 384 px, Kaggle T4, split by photographer |
+| Validation | Precision 0.845 · Recall 0.725 · mAP50 0.828 | Threshold 0.5 chosen on held-out photographers |
 
 ### How well does it work on real rivers?
 
@@ -65,17 +65,15 @@ right SAFE/DANGER call:
 
 | Test set | Detector only | **Detector + dense check (shipped)** |
 |---|---|---|
-| Trash-carpeted rivers (66 photos, 50 should alert) | 37.9% · 41 missed | **80.3% · 13 missed · 0 false alarms** |
+| Trash-carpeted rivers (66 photos, 50 should alert) | 36.4% · 42 missed | **78.8% · 14 missed · 0 false alarms** |
 | Unseen photographers (108 photos, 10 should alert) | 91.7% · 9 missed | **97.2% · 1 missed · 2 false alarms** |
-| Real river scenes, 0–30 items (17 photos) | 82.4% · 2 missed · 1 false alarm | 82.4% · 1 missed · 2 false alarms |
-| Original test split (273 images) | 97.1% · 3 false alarms | 94.5% · 10 false alarms |
+| Real river scenes, 0–30 items (17 photos) | 94.1% | 88.2% (1 false alarm) |
+| Original test split (273 images) | 96.3% · 5 false alarms | 93.8% · 12 false alarms |
 
-**The dense check turns RiverGuard from blind to trash-carpeted rivers into catching four in five**, at the
+**The dense check turns RiverGuard from blind to trash-carpeted rivers into catching about three in four**, at the
 cost of a few extra false alarms on close-up photos of litter. For a flood early-warning system a missed blockage is
 the expensive mistake, and the alert cooldown keeps occasional false alarms from spamming the crew. The full
-experiment history, including the retraining attempts that failed and why, is in [training/README.md](training/README.md).
-Compared with v1, the shipped v4 detector stops boxing people, recognises cans, and is equal or better on three of
-the four sets; on the 17 real river scenes it raises one extra false alarm (coins on a lily pad, see Limitations).
+experiment history, including two retraining attempts that failed and why, is in [training/README.md](training/README.md).
 
 ## Quickstart
 
@@ -93,7 +91,7 @@ pip install -r requirements.txt
 
 ```bash
 python run_camera.py --source 0                         # webcam
-python run_camera.py --source examples/versailles-pond.jpg  # image
+python run_camera.py --source examples/river-bottles.jpg    # image
 python run_camera.py --source river.mp4 --threshold 8   # video file
 python run_camera.py --source rtsp://camera/stream --no-show   # headless next to a CCTV
 ```
@@ -157,19 +155,16 @@ and never message a real chat.
 
 ## Limitations & next steps
 
-- **The dense check still misses about one in five trash-carpeted scenes**, including piles of trash on a river bank
-  (as opposed to a carpet on the water), and sometimes fires on close-up photos of a few items. It was trained on
-  only ~100 dense photos, and openly licensed photos of trash piles at rivers are rare; more varied dense examples
-  are the main lever (see [training/README.md](training/README.md)). Murky water and night-time footage are untested.
-- **Small white shapes on water can still look like plastic** to the item detector: coins on a lily pad become
-  several "bags", and when large photos are scanned in tiles a small cloud can get a `plastic_bag` box. A retrain
-  with 330 look-alike photos (clouds, birds, sails, ice, foam) fixed the cloud but recognised fewer cans and lost
-  accuracy elsewhere, so it wasn't shipped. A drink can photographed close up can still come out as
-  `plastic_bottle`; held-out cans in the training datasets' style are labelled `other_trash` 83% of the time.
-- The v1 detector boxed faces as trash (12 of 16 test selfies) because it had never seen a person; v4 learned from
-  photos of people and boxes 1 of 16. A small face detector
-  ([YuNet](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet), MIT licence) still drops any
-  box that covers a face, as a safety net for the webcam.
+- **The dense check still misses about one in four trash-carpeted scenes** and sometimes fires on close-up photos
+  of a few items. It was trained on only ~100 dense photos; more varied dense examples are the main lever (a third
+  round with more "not dense" photos made it more cautious rather than better, see
+  [training/README.md](training/README.md)). Murky water and night-time footage are untested.
+- **The item detector has only ever seen rivers.** It never saw a person, so it boxed faces as trash (12 of 16 test
+  selfies), and its four classes are all plastic, so a drink can comes out as `plastic_bottle`. For now a small face
+  detector ([YuNet](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet), MIT licence) drops
+  boxes that cover a face; on the river test sets it changed no SAFE/DANGER call. A retrain with photos of people as
+  negative examples and an `other_trash` class for cans (v4) fixed both, but started calling small white shapes
+  plastic; it's documented in [training/README.md](training/README.md) and not the shipped model.
 - The original proposal also described a three-level scale (safe / warning / danger) and GPS-tagged alerts; neither
   is implemented yet.
 - Counting is per frame, so the same bottle is re-counted as it drifts past. Tracking (e.g. ByteTrack) would allow
@@ -183,7 +178,5 @@ RiverGuard started as a 3-person group project for the Artificial Intelligence c
 ## License
 
 [AGPL-3.0](LICENSE), inherited from [Ultralytics YOLO](https://github.com/ultralytics/ultralytics). The YuNet face
-model is MIT-licensed ([its licence](models/face_detection_yunet_2023mar.LICENSE)). Images are licensed separately:
-see [examples/ATTRIBUTION.md](examples/ATTRIBUTION.md) and the training credits in
-[training/ATTRIBUTION.md](training/ATTRIBUTION.md), [training/DENSITY_ATTRIBUTION.md](training/DENSITY_ATTRIBUTION.md)
-and [training/NEGATIVES_ATTRIBUTION.md](training/NEGATIVES_ATTRIBUTION.md) (the photos of people).
+model is MIT-licensed ([its licence](models/face_detection_yunet_2023mar.LICENSE)). Images are licensed separately: see [examples/ATTRIBUTION.md](examples/ATTRIBUTION.md) and the training credits in
+[training/ATTRIBUTION.md](training/ATTRIBUTION.md) and [training/DENSITY_ATTRIBUTION.md](training/DENSITY_ATTRIBUTION.md).

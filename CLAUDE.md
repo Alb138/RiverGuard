@@ -11,7 +11,7 @@ retraining pipeline (`training/`).
 .venv/Scripts/python app.py                     # web app on http://127.0.0.1:7860
 .venv-demo/Scripts/python -m streamlit run demo/streamlit_app.py   # public demo (Python 3.13 venv, demo/requirements.txt)
 .venv-demo/Scripts/python -m pytest -q tests/test_demo.py          # demo smoke test (skipped in the 3.10 venv)
-.venv/Scripts/python run_camera.py --source examples/versailles-pond.jpg --no-show
+.venv/Scripts/python run_camera.py --source examples/river-bottles.jpg --no-show
 .venv/Scripts/python training/evaluate.py --tags datasets/tier-b/tags.csv models/best.pt --tiled
 training/kaggle.sh kernels list --mine          # Kaggle CLI (needs Python 3.11+, lives in .venv-tools)
 ```
@@ -25,13 +25,13 @@ training/kaggle.sh kernels list --mine          # Kaggle CLI (needs Python 3.11+
 - The public demo must never send Telegram alerts: visitors only see an alert *preview*. `demo/streamlit_app.py` has
   no alerter at all; keep it that way and never add Telegram secrets to Streamlit Cloud.
 - Credit teammates as "a 3-person group project", without names.
-- `models/best.pt` is v4 (item detector, 5 classes incl. `other_trash`, fine-tuned from v1 with people photos as
-  negatives, `training/sources-v4.yaml`); `models/density.pt` is the v3b dense-trash classifier (threshold 0.5).
-  Replace either only when a new model beats it on the test sets in `training/README.md` (the user accepted v4 with
-  one extra tier-A false alarm), and copy that build's credits: `datasets/density-*/ATTRIBUTION.md` to
-  `training/DENSITY_ATTRIBUTION.md`, `datasets/negatives*/ATTRIBUTION.md` to `training/NEGATIVES_ATTRIBUTION.md`.
+- `models/best.pt` is v1 (item detector); `models/density.pt` is the v3b dense-trash classifier (threshold 0.5).
+  Replace either only when a new model beats it on the test sets in `training/README.md`, and when replacing
+  `density.pt`, copy that build's `datasets/density-*/ATTRIBUTION.md` to `training/DENSITY_ATTRIBUTION.md`.
 - `models/face_detection_yunet_2023mar.onnx` (YuNet, MIT, licence file next to it) drops trash boxes that cover a
-  face. v1 boxed faces as trash; v4 rarely does, but the user chose to keep the filter as a safety net.
+  face: the v1 detector never saw people and boxed faces as trash.
+- v4 (people negatives + `other_trash`, `runs/kaggle-v4/v4.pt`, results in `training/README.md`) was shipped on
+  2026-11-11 and rolled back to v1 the same day at the user's request. Don't re-ship it without asking.
 - The live demo runs `models/*.onnx`, not the `.pt` files. Re-export after replacing a `.pt` (commands in the README's
   Deployment section); `test_onnx_exports_match_pytorch_models` fails until you do.
 - Keep demo examples (`examples/`) free of trash-carpeted scenes, and check each one doesn't trigger a false alarm.

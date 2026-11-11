@@ -23,7 +23,7 @@ def build_caption(result: DetectionResult, when: datetime | None = None) -> str:
     breakdown = ", ".join(f"{html.escape(label)} ×{n}" for label, n in result.per_class.items())
     patches = len(result.patches)
     return (
-        "🚨 <b>ALERT: WASTE BUILD-UP</b> 🚨\n\n"
+        "🚨 <b>ALERT: PLASTIC WASTE BUILD-UP</b> 🚨\n\n"
         + (f"🟧 Dense trash covering the water ({result.dense_score:.0%} confidence)\n" if result.is_dense else "")
         + (f"🟧 Dense trash: {patches} area{'s' if patches != 1 else ''} too packed to count\n" if patches else "")
         + f"🔢 Detected: {items(result.count)}\n"

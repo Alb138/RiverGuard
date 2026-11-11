@@ -1,12 +1,12 @@
 # Example image credits
 
-These photos come from Wikimedia Commons, were resized to at most 1280 px, and are **not** covered by the repository's
-AGPL-3.0 license.
+These photos come from Wikimedia Commons and Flickr, were resized to at most 1280 px, and are **not** covered by the
+repository's AGPL-3.0 license.
 
 | File | Original | Author | License |
 |---|---|---|---|
 | `river-bank-bottles.jpg` | [Nature's Silent Struggle](https://commons.wikimedia.org/wiki/File:Nature%E2%80%99s_Silent_Struggle.jpg) | Jemir Shamir | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
-| `versailles-pond.jpg` | [Pollution eau versailles](https://commons.wikimedia.org/wiki/File:Pollution_eau_versailles.jpg) | --Pinpin | [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) |
+| `river-bottles.jpg` | [Close-up of plastic bottles polluting the river with a bridge and buildings in a blurry background](https://www.flickr.com/photos/26344495@N05/51142599174) | Ivan Radic | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) |
 | `danube-bottle.jpg` | [Plastic bottle floating on the surface of the Danube river](https://commons.wikimedia.org/wiki/File:Plastic_bottle_floating_on_the_surface_of_the_Danube_river._Water_contamination_(48687167466).jpg) | Ivan Radic | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) |
 
 `docs/demo-detection.jpg` is `river-bank-bottles.jpg` with RiverGuard's detections drawn on it. It is also

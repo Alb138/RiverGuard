@@ -2,7 +2,7 @@
 
     python run_camera.py --source 0                  # default webcam
     python run_camera.py --source river.mp4
-    python run_camera.py --source examples/versailles-pond.jpg --threshold 3
+    python run_camera.py --source examples/river-bottles.jpg --threshold 3
     python run_camera.py --source rtsp://... --no-show  # headless, e.g. on a server next to a CCTV
 """
 

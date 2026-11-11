@@ -123,7 +123,7 @@ v4 then called small white shapes plastic (coins on a lily pad, a cloud), so **v
 look-alike set (clouds, swans, gulls, egrets, sails, ice, lily pads, foam) and less of the lake footage whose
 distant bottles are white specks ([sources-v4b.yaml](sources-v4b.yaml)).
 
-| Alarm = items > 5 **or** dense (tiled) | v1 | **v4** (shipped) | v4b |
+| Alarm = items > 5 **or** dense (tiled) | **v1** (shipped) | v4 | v4b |
 |---|---|---|---|
 | In-domain (273) | 93.8% · 5 missed · 12 false | **94.5% · 5 · 10** | 93.4% · 6 · 12 |
 | Tier A (17) | **88.2% · 1 · 1** | 82.4% · 1 · 2 | 82.4% · 1 · 2 |
@@ -134,10 +134,11 @@ distant bottles are white specks ([sources-v4b.yaml](sources-v4b.yaml)).
 | Held-out look-alikes with any box (46) | 33% | 17% | **13%** |
 | Test selfies with a box (16) | 12 | **1** | — |
 
-v4 ships: it fixes both reported failures and is equal or better everywhere except tier A, where the coins on a
-lily pad became 6 "plastic bags" (one extra false alarm). v4b fixed the cloud and halved look-alike boxes, but lost
-cans and in-domain accuracy, and still alarmed on the coins. The face filter stays as a safety net; on top of v4 it
-removed nothing on the test sets.
+v4 fixes both reported failures and is equal or better everywhere except tier A, where the coins on a lily pad
+became 6 "plastic bags" (one extra false alarm), and it boxes a small cloud in one of the demo photos. It was
+shipped briefly and then rolled back: **v1 stays the shipped detector**, with the face filter covering the webcam
+case, and v4's weights stay in `runs/kaggle-v4/`. v4b fixed the cloud and halved look-alike boxes, but lost cans
+and in-domain accuracy, and still alarmed on the coins.
 
 Collecting more *dense* photos for the classifier (piles of trash on river banks, which v3b misses) was tried in the
 same round: about 600 title-matched Commons photos, ranked by v3b, yielded 6 new dense scenes. Commons search results

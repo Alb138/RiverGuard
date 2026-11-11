@@ -24,7 +24,7 @@ def test_demo_alerts_on_the_dense_example_and_stays_safe_on_the_pond(monkeypatch
     assert "DANGER: dense trash + " in page and "RiverGuard bot · alert preview" in page
     assert "The public demo never sends one." in page
 
-    at.button_group(key="example").set_value("versailles-pond.jpg").run()
+    at.button_group(key="example").set_value("river-bottles.jpg").run()
     assert not at.exception
     page = html_bodies(at)
     assert "SAFE: 3 items" in page and "No alert" in page

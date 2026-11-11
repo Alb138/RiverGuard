@@ -54,7 +54,7 @@ DEFAULTS = Settings()  # thresholds only: this app never reads Telegram credenti
 EXAMPLES = sorted((ROOT / "examples").glob("*.jpg"))
 FIRST_EXAMPLE = ROOT / "examples" / "river-bank-bottles.jpg"  # shown on arrival: dense trash, so it alerts
 EXAMPLE_LABELS = {"river-bank-bottles.jpg": "River bank", "danube-bottle.jpg": "Danube",
-                  "versailles-pond.jpg": "Pond"}  # short, so all three fit on one line on a phone
+                  "river-bottles.jpg": "Bridge"}  # short, so all three fit on one line on a phone
 VIDEO_MAX_SECONDS = 10
 VIDEO_FPS = 2
 PREVIEW_NOTE = "👀 Demo mode: this is a preview of the Telegram alert. The public demo never sends one."
@@ -84,7 +84,7 @@ def decode(data: bytes) -> np.ndarray:
     return fit_within(cv2.cvtColor(np.asarray(img), cv2.COLOR_RGB2BGR))
 
 
-@st.cache_data(max_entries=64, show_spinner="Looking for trash…")
+@st.cache_data(max_entries=64, show_spinner="Looking for plastic…")
 def analyze(data: bytes, conf: float, threshold: int, tiled: bool, version: str) -> tuple[np.ndarray, DetectionResult]:
     """Annotated BGR frame and result. Cached across visitors, so the examples are instant after the first run.
     `version` keeps results from older code out of the cache."""
