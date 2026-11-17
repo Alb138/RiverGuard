@@ -1,5 +1,5 @@
 [server]
-maxUploadSize = 100  # MB: enough for a short phone video (only its first seconds are analysed)
+maxUploadSize = 25  # MB: plenty for a full-size phone photo
 
 [browser]
 gatherUsageStats = false

@@ -25,7 +25,7 @@ FOOTER = (
     "Models: YOLO11s item detector fine-tuned on a public Roboflow river-trash dataset "
     "(P 0.85 · R 0.72 · mAP50 0.83), and a YOLO11s-cls dense-trash classifier "
     "(79% correct alarms on trash-carpeted test rivers). "
-    "[Source code on GitHub](https://github.com/Alb138/RiverGuard) · Originally a university group project."
+    "[Source code on GitHub](https://github.com/Alb138/RiverGuard)"
 )
 
 

@@ -19,7 +19,7 @@ def test_demo_alerts_on_the_dense_example_and_stays_safe_on_the_pond(monkeypatch
 
     at = testing.AppTest.from_file(str(ROOT / "demo" / "streamlit_app.py"), default_timeout=180).run()
     assert not at.exception
-    assert [t.label for t in at.tabs] == ["Image", "Video", "Webcam"]
+    assert [t.label for t in at.tabs] == ["Image", "Webcam"]
     page = html_bodies(at)
     assert "DANGER: dense trash + " in page and "RiverGuard bot · alert preview" in page
     assert "The public demo never sends one." in page

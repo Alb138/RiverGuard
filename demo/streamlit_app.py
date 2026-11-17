@@ -11,7 +11,6 @@ import hashlib
 import io
 import os
 import sys
-import tempfile
 import threading
 from pathlib import Path
 
@@ -48,15 +47,13 @@ import riverguard  # noqa: E402
 riverguard.demo_version = VERSION
 from riverguard import DetectionResult, Settings, TrashDetector, annotate  # noqa: E402
 from riverguard.detector import MAX_SIDE, fit_within  # noqa: E402
-from riverguard.web import FOOTER, INTRO, alert_preview_html, alert_rule, annotate_video, status_html  # noqa: E402
+from riverguard.web import FOOTER, INTRO, alert_preview_html, alert_rule, status_html  # noqa: E402
 
 DEFAULTS = Settings()  # thresholds only: this app never reads Telegram credentials
 EXAMPLES = sorted((ROOT / "examples").glob("*.jpg"))
 FIRST_EXAMPLE = ROOT / "examples" / "river-bank-bottles.jpg"  # shown on arrival: dense trash, so it alerts
 EXAMPLE_LABELS = {"river-bank-bottles.jpg": "River bank", "danube-bottle.jpg": "Danube",
                   "river-bottles.jpg": "Bridge"}  # short, so all three fit on one line on a phone
-VIDEO_MAX_SECONDS = 10
-VIDEO_FPS = 2
 PREVIEW_NOTE = "👀 Demo mode: this is a preview of the Telegram alert. The public demo never sends one."
 
 st.set_page_config(page_title="RiverGuard", page_icon="🌊", layout="wide")
@@ -123,7 +120,7 @@ left, right = st.columns(2)
 conf = left.slider("Detection confidence", 0.05, 0.9, DEFAULTS.conf_threshold, 0.05)
 threshold = right.slider("Alert threshold (alert when count is above this)", 0, 30, DEFAULTS.alert_threshold, 1)
 
-image_tab, video_tab, camera_tab = st.tabs(["Image", "Video", "Webcam"], key="tab", on_change="rerun")
+image_tab, camera_tab = st.tabs(["Image", "Webcam"], key="tab", on_change="rerun")
 
 with image_tab:
     if image_tab.open:  # only the open tab runs, so a hidden webcam never asks for camera access
@@ -144,42 +141,6 @@ with image_tab:
             right.error(f"Could not read {name} as an image.")
         else:
             show_result(annotated, result, right)
-
-with video_tab:
-    if video_tab.open:
-        st.markdown(f"The first {VIDEO_MAX_SECONDS} seconds are analysed at {VIDEO_FPS} frames per second. "
-                    "The alert uses the frame with the most items.")
-        left, right = st.columns(2)
-        with left:
-            video = st.file_uploader("River video", type=["mp4", "mov", "avi", "webm", "mkv"], key="video")
-            start = st.button("Analyse video", type="primary", disabled=video is None)
-        if start and video is not None:
-            with tempfile.NamedTemporaryFile(suffix=Path(video.name).suffix, delete=False) as f:
-                f.write(video.getvalue())
-            bar = right.progress(0.0, "Analysing frames…")
-            try:
-                out_path, result, annotated, t, seconds = annotate_video(
-                    f.name, lambda frame: detect(frame, threshold, conf), VIDEO_MAX_SECONDS, VIDEO_FPS,
-                    progress=lambda fraction: bar.progress(min(fraction, 1.0), "Analysing frames…"))
-            except ValueError as e:
-                right.error(str(e))
-            else:
-                summary = status_html(result, RULE, prefix="peak of ") + (
-                    f"<p style='opacity:.75'>Peak at {t:.1f}s. Analysed the first {seconds:.0f}s "
-                    f"at {VIDEO_FPS} fps.</p>")
-                st.session_state.video_result = ((video.file_id, conf, threshold), Path(out_path).read_bytes(),
-                                                 summary, alert_preview_html(annotated, result, PREVIEW_NOTE))
-                os.remove(out_path)
-            finally:
-                os.remove(f.name)
-                bar.empty()
-        saved = st.session_state.get("video_result")
-        if video is not None and saved and saved[0] == (video.file_id, conf, threshold):
-            _, mp4, summary, preview = saved
-            with right:
-                st.video(mp4)
-                st.html(summary)
-            st.html(preview)
 
 with camera_tab:
     if camera_tab.open:
