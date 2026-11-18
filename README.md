@@ -170,10 +170,6 @@ and never message a real chat.
 - Counting is per frame, so the same bottle is re-counted as it drifts past. Tracking (e.g. ByteTrack) would allow
   counting unique items over time.
 
-## Background
-
-RiverGuard started as a 3-person group project for the Artificial Intelligence course at BINUS University
-(3rd semester, January 2026). This repository is a cleaned-up and deployed version of that prototype.
 
 ## License
 
